@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '../errors';
 import { PROVIDER_KEY_NAMES, readServerEnv } from '../env';
+import { DEFAULT_FREE_MODEL, isFreeOpenCodeModel, validateModel } from '../models';
 import {
   diffSnapshots,
   snapshotFiles,
@@ -264,17 +265,24 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
       'The real OpenCode runtime is not available in this function. No agent reply was generated. See docs/ARCHITECTURE.md.',
     );
   }
-  if (!cfg.openCodeModel || cfg.providerKeyNames.length === 0) {
+  let model: string;
+  try {
+    model = validateModel(request.model, cfg.openCodeModel || DEFAULT_FREE_MODEL);
+  } catch (error) {
+    throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
+  }
+  // Official OpenCode Zen free models work signed out; everything else needs a key.
+  if (!isFreeOpenCodeModel(model) && cfg.providerKeyNames.length === 0) {
     throw new AppError(
       503,
       'OPENCODE_NOT_CONFIGURED',
-      'OPENCODE_MODEL and one model-provider key are required for a real agent run. No reply was generated.',
+      'A model-provider key is required for a non-free model. No reply was generated.',
     );
   }
 
-  await writeWorkspaceOpenCodeConfig(request.workspace.repo, cfg.openCodeModel);
+  await writeWorkspaceOpenCodeConfig(request.workspace.repo, model);
   const before = await snapshotFiles(request.workspace.repo);
-  const args = ['--standalone', 'run', '--format', 'json', '--auto', '--model', cfg.openCodeModel];
+  const args = ['--standalone', 'run', '--format', 'json', '--auto', '--model', model];
   let spawned: SpawnResult;
   try {
     spawned = await spawnWithTimeout(binary, args, {
@@ -320,6 +328,74 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
     workspaceEphemeral: true,
     timedOut: spawned.timedOut,
   };
+}
+
+/** Real, tiny model-backed run used to verify an official free model works. */
+export type ModelSmokeResult = {
+  ok: boolean;
+  runtimeId: 'opencode-cli';
+  model: string;
+  text: string | null;
+  error: string | null;
+  exitCode: number | null;
+  durationMs: number;
+  timedOut: boolean;
+  stdout: string;
+  stderr: string;
+};
+
+export async function runOpenCodeSmokeTest(requestedModel: string): Promise<ModelSmokeResult> {
+  const cfg = readServerEnv();
+  const binary = resolveOpenCodeBinary();
+  if (!binary) {
+    throw new AppError(503, 'OPENCODE_RUNTIME_NOT_FOUND', 'The real OpenCode binary is not available in this function.');
+  }
+  let model: string;
+  try {
+    model = validateModel(requestedModel, cfg.openCodeModel || DEFAULT_FREE_MODEL);
+  } catch (error) {
+    throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
+  }
+  if (!isFreeOpenCodeModel(model) && cfg.providerKeyNames.length === 0) {
+    throw new AppError(503, 'OPENCODE_NOT_CONFIGURED', 'A model-provider key is required for a non-free model.');
+  }
+  return withTempWorkspace(async (workspace) => {
+    await writeWorkspaceOpenCodeConfig(workspace.repo, model);
+    await writeFile(path.join(workspace.repo, 'README.md'), '# free-model smoke test\n', 'utf8');
+    const args = ['--standalone', 'run', '--format', 'json', '--auto', '--model', model];
+    let spawned: SpawnResult;
+    try {
+      spawned = await spawnWithTimeout(binary, args, {
+        cwd: workspace.repo,
+        env: buildChildEnv(workspace),
+        timeoutMs: Math.min(cfg.openCodeTimeoutMs, 90_000),
+        maxOutputBytes: cfg.openCodeMaxOutputBytes,
+        stdin: 'Reply with the single word OK.',
+      });
+    } catch (error) {
+      throw new AppError(502, 'OPENCODE_SPAWN_FAILED', `Could not start OpenCode: ${redactSecrets(String(error))}`);
+    }
+    const parsed = extractAssistantText(spawned.stdout);
+    const stdout = redactSecrets(spawned.stdout);
+    const stderr = redactSecrets(spawned.stderr);
+    let error: string | null = null;
+    if (spawned.timedOut) error = 'AGENT_TIMEOUT: the model did not answer within the smoke-test limit.';
+    else if (spawned.exitCode !== 0 || parsed.errors.length > 0)
+      error = parsed.errors[0] ?? stderr.slice(0, 500) ?? `OpenCode exited with code ${spawned.exitCode}`;
+    else if (!parsed.text) error = 'OPENCODE_NO_OUTPUT: the real runtime produced no assistant text.';
+    return {
+      ok: error === null,
+      runtimeId: RUNTIME_ID,
+      model,
+      text: parsed.text,
+      error,
+      exitCode: spawned.exitCode,
+      durationMs: spawned.durationMs,
+      timedOut: spawned.timedOut,
+      stdout: stdout.slice(0, 2000),
+      stderr: stderr.slice(0, 1000),
+    };
+  });
 }
 
 export const openCodeCliAdapter: RuntimeAdapter = {

@@ -4,10 +4,11 @@ import { assertOwnership, githubLoginFromUser } from '@/lib/auth';
 import { createSession, getSession, insertMessage } from '@/lib/data';
 import { configStatus, readServerEnv } from '@/lib/env';
 import { AppError, safeErrorMessage } from '@/lib/errors';
-import { createInstallationToken } from '@/lib/github/app';
-import { downloadRepositoryArchive, listInstallationRepositories, userCanAccessRepository } from '@/lib/github/repos';
+import { assertRepoAuthorized, listAuthorizedRepositories, resolveGitHubContext } from '@/lib/github/context';
+import { downloadRepositoryArchive } from '@/lib/github/repos';
 import { jsonError, jsonOk } from '@/lib/http';
 import { probeOpenCode, resolveOpenCodeBinary, runOpenCodeAgent } from '@/lib/runtime';
+import { validateModel } from '@/lib/models';
 import { requireRouteUser } from '@/lib/route-context';
 import { validatePrompt, validateRef, validateRepoFullName, validateSessionId, ValidationError } from '@/lib/validation';
 import { extractRepositoryArchive, withTempWorkspace } from '@/lib/workspace';
@@ -28,9 +29,16 @@ export async function POST(request: NextRequest) {
     // A user id from the browser is never trusted; reject a mismatched one.
     assertOwnership(user.id, typeof body.userId === 'string' ? body.userId : null);
 
+    const cfg = readServerEnv();
     const repoFullName = validateRepoFullName(body.repoFullName);
     const ref = validateRef(body.ref);
     const prompt = validatePrompt(body.prompt);
+    let selectedModel: string;
+    try {
+      selectedModel = validateModel(body.model, cfg.openCodeModel);
+    } catch (error) {
+      throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
+    }
 
     let sessionId = body.sessionId ? validateSessionId(body.sessionId) : null;
     if (sessionId) {
@@ -49,27 +57,16 @@ export async function POST(request: NextRequest) {
       sessionId,
       role: 'user',
       content: prompt,
-      metadata: { repoFullName, ref },
+      metadata: { repoFullName, ref, model: selectedModel },
     });
 
-    // --- repository authorization (least-privilege GitHub App) ---------------
-    const cfg = readServerEnv();
-    if (!cfg.githubAppId || !cfg.githubAppPrivateKey || !cfg.githubInstallationId) {
-      throw new AppError(503, 'GITHUB_APP_NOT_CONFIGURED', 'GitHub App is not configured; repository access was not attempted.');
-    }
-    const token = await createInstallationToken({
-      appId: cfg.githubAppId,
-      privateKey: cfg.githubAppPrivateKey,
-      installationId: cfg.githubInstallationId,
-    });
-    const repos = await listInstallationRepositories(token);
-    if (!repos.some((repo) => repo.full_name === repoFullName)) {
-      throw new AppError(403, 'REPO_NOT_AUTHORIZED', 'The selected repository is not in the GitHub App installation allowlist.');
-    }
+    // --- repository authorization (GitHub App preferred, PAT fallback) -------
+    const github = await resolveGitHubContext();
+    const allowlist = await listAuthorizedRepositories(github);
     const login = githubLoginFromUser(user);
     if (!login) throw new AppError(403, 'GITHUB_IDENTITY_MISSING', 'Cannot verify GitHub repository access for this account.');
-    const allowed = await userCanAccessRepository(token, repoFullName, login);
-    if (!allowed) throw new AppError(403, 'REPO_NOT_AUTHORIZED', 'You are not a collaborator on the selected repository.');
+    await assertRepoAuthorized(github, repoFullName, login, allowlist);
+    const token = github.token;
 
     // --- runtime configuration (never fabricate a reply) ---------------------
     const status = configStatus();
@@ -89,7 +86,7 @@ export async function POST(request: NextRequest) {
       const archivePath = path.join(workspace.tmp, 'repo.tar.gz');
       await downloadRepositoryArchive(token, repoFullName, ref, archivePath, cfg.openCodeMaxRepoBytes);
       await extractRepositoryArchive(archivePath, workspace.repo);
-      return runOpenCodeAgent({ workspace, prompt, repoFullName, ref });
+      return runOpenCodeAgent({ workspace, prompt, repoFullName, ref, model: selectedModel });
     });
 
     if (result.ok) {
@@ -99,6 +96,7 @@ export async function POST(request: NextRequest) {
         content: result.text ?? '',
         metadata: {
           runtime: result.runtimeId,
+          model: selectedModel,
           repoFullName,
           ref,
           workspace: 'ephemeral',
@@ -141,6 +139,7 @@ export async function POST(request: NextRequest) {
             changes: result.changes,
             patch: result.patch,
             runtime: result.runtimeId,
+            model: selectedModel,
             workspace: 'ephemeral',
           },
         },

@@ -110,3 +110,59 @@ export async function downloadRepositoryArchive(
   await writeFile(destination, Buffer.concat(chunks));
   return { bytes: total };
 }
+
+/**
+ * Repositories visible to a server-side fine-grained PAT. This is an alternative
+ * to the GitHub App; the browser never receives the token. Repo contents are
+ * still treated as untrusted and every selected repo is authorized per user.
+ */
+export async function listUserRepositories(
+  token: string,
+  fetchImpl: FetchImpl = fetch,
+  maxPages = 3,
+): Promise<RepoInfo[]> {
+  const repos: RepoInfo[] = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await githubApi(
+      `/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`,
+      token,
+      {},
+      fetchImpl,
+    );
+    if (!response.ok) {
+      throw new AppError(502, 'GITHUB_REPOS_FAILED', `Could not list repositories (HTTP ${response.status}).`);
+    }
+    const rows = (await response.json()) as Array<{
+      full_name?: string;
+      name?: string;
+      private?: boolean;
+      default_branch?: string;
+      description?: string | null;
+      owner?: { login?: string };
+    }>;
+    if (!Array.isArray(rows)) break;
+    for (const row of rows) {
+      if (!row.full_name || !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(row.full_name)) continue;
+      repos.push({
+        full_name: row.full_name,
+        name: row.name ?? row.full_name.split('/')[1] ?? '',
+        owner: row.owner?.login ?? row.full_name.split('/')[0] ?? '',
+        private: Boolean(row.private),
+        default_branch: row.default_branch ?? 'main',
+        description: row.description ?? null,
+      });
+    }
+    if (rows.length < 100) break;
+  }
+  return repos;
+}
+
+/** Login of the account that owns the server-side PAT (never exposed to the browser). */
+export async function patOwnerLogin(token: string, fetchImpl: FetchImpl = fetch): Promise<string | null> {
+  const response = await githubApi('/user', token, {}, fetchImpl);
+  if (!response.ok) {
+    throw new AppError(502, 'GITHUB_IDENTITY_FAILED', `Could not read GitHub token identity (HTTP ${response.status}).`);
+  }
+  const body = (await response.json()) as { login?: string };
+  return typeof body.login === 'string' ? body.login : null;
+}

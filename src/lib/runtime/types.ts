@@ -30,6 +30,8 @@ export type AgentRunRequest = {
   prompt: string;
   repoFullName: string;
   ref: string;
+  /** Validated official free model or the server-configured model. */
+  model?: string;
 };
 
 export interface RuntimeAdapter {

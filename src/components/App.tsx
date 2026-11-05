@@ -15,10 +15,35 @@ type MeResponse = {
 type ConfigStatus = {
   supabaseConfigured: boolean;
   githubAppConfigured: boolean;
+  githubPatConfigured: boolean;
+  githubMode: 'app' | 'pat' | 'none';
   openCodeConfigured: boolean;
   binaryPathProvided: boolean;
+  model: string;
+  freeModel: boolean;
+  modelTestsEnabled: boolean;
   missing: string[];
   setupMessage: string;
+};
+
+type FreeModel = {
+  id: string;
+  fullId: string;
+  name: string;
+  context: number;
+  output: number;
+  requiresKey: false;
+  preferred: boolean;
+};
+
+type ModelTestResult = {
+  ok: boolean;
+  model: string;
+  text: string | null;
+  error: string | null;
+  exitCode: number | null;
+  durationMs: number;
+  timedOut: boolean;
 };
 
 type Repo = {
@@ -110,6 +135,11 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [probe, setProbe] = useState<ProbeResult | null>(null);
   const [probing, setProbing] = useState(false);
+  const [models, setModels] = useState<FreeModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState('opencode/deepseek-v4.1-flash-free');
+  const [modelTests, setModelTests] = useState<ModelTestResult[]>([]);
+  const [testing, setTesting] = useState(false);
+  const [testingAll, setTestingAll] = useState(false);
 
   const loadMessages = useCallback(async (id: string) => {
     const response = await api<{ messages: Message[] }>(`/api/sessions/${id}/messages`);
@@ -120,12 +150,15 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [meRes, configRes] = await Promise.all([
+      const [meRes, configRes, modelsRes] = await Promise.all([
         api<MeResponse>('/api/me'),
         api<ConfigStatus>('/api/config'),
+        api<{ models: FreeModel[]; configuredModel: string }>('/api/models'),
       ]);
       setMe(meRes);
       setConfig(configRes);
+      setModels(modelsRes.models);
+      setSelectedModel((current) => current || modelsRes.configuredModel || 'opencode/deepseek-v4.1-flash-free');
       if (!meRes.user) {
         setSessions([]);
         setRepos([]);
@@ -202,7 +235,7 @@ export default function App() {
     try {
       const response = await api<RunResult>('/api/agent/run', {
         method: 'POST',
-        body: JSON.stringify({ sessionId: activeId, repoFullName: selectedRepo, ref, prompt }),
+        body: JSON.stringify({ sessionId: activeId, repoFullName: selectedRepo, ref, prompt, model: selectedModel }),
       });
       setActiveId(response.sessionId);
       await Promise.all([
@@ -234,6 +267,39 @@ export default function App() {
     } finally {
       setProbing(false);
     }
+  };
+
+  const testModel = async (model: string) => {
+    setTesting(true);
+    setError(null);
+    try {
+      const result = await api<ModelTestResult>(`/api/models/test?model=${encodeURIComponent(model)}`);
+      setModelTests((previous) => [result, ...previous.filter((item) => item.model !== result.model)].slice(0, 47));
+    } catch (err) {
+      setModelTests((previous) => [
+        {
+          model,
+          ok: false,
+          text: null,
+          error: err instanceof Error ? err.message : 'Model test failed',
+          exitCode: null,
+          durationMs: 0,
+          timedOut: false,
+        },
+        ...previous,
+      ].slice(0, 47));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const testAllModels = async () => {
+    setTestingAll(true);
+    setModelTests([]);
+    for (const model of models) {
+      await testModel(model.fullId);
+    }
+    setTestingAll(false);
   };
 
   if (loading) {
@@ -300,6 +366,13 @@ export default function App() {
             <strong>Setup incomplete.</strong> {config.setupMessage} No agent reply is simulated.
           </div>
         )}
+        {config && (
+          <div className="notice">
+            <strong>Model:</strong> <code>{config.model}</code> —{' '}
+            {config.freeModel ? 'official free OpenCode Zen model, no API key needed' : 'requires a provider key'}.
+            GitHub access: <code>{config.githubMode}</code>. {models.length} free models available.
+          </div>
+        )}
         {repoError && <div className="notice warn">Repository list unavailable: {repoError}</div>}
         {error && <div className="notice error">{error}</div>}
         {notice && <div className="notice">{notice}</div>}
@@ -327,6 +400,49 @@ export default function App() {
                   <label htmlFor="ref">Branch / tag / SHA</label>
                   <input id="ref" value={ref} onChange={(event) => setRef(event.target.value)} />
                 </div>
+              </>
+            )}
+          </div>
+
+          <div className="card">
+            <h2>Model (official free OpenCode Zen)</h2>
+            {models.length === 0 ? (
+              <div className="empty">Model catalog unavailable.</div>
+            ) : (
+              <>
+                <div className="field">
+                  <label htmlFor="model">Free model — no API key required</label>
+                  <select id="model" value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
+                    {models.map((model) => (
+                      <option key={model.fullId} value={model.fullId}>
+                        {model.name}{model.preferred ? ' ★' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="hint">{models.length} free models from the official OpenCode catalog.</div>
+                {config?.modelTestsEnabled ? (
+                  <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                    <button className="btn small" type="button" onClick={() => void testModel(selectedModel)} disabled={testing || testingAll}>
+                      {testing ? <><span className="spinner" /> Testing…</> : 'Test this model'}
+                    </button>
+                    <button className="btn small ghost" type="button" onClick={() => void testAllModels()} disabled={testing || testingAll}>
+                      {testingAll ? <><span className="spinner" /> Testing all…</> : 'Test all free models'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="hint" style={{ marginTop: 8 }}>Model verification off (set ENABLE_MODEL_TESTS=1).</div>
+                )}
+                {modelTests.length > 0 && (
+                  <div className="session-list" style={{ marginTop: 10, maxHeight: 220 }}>
+                    {modelTests.map((result) => (
+                      <div key={result.model} className={`msg ${result.ok ? 'assistant' : 'system'}`} style={{ padding: '7px 9px' }}>
+                        <div className="who">{result.ok ? 'PASS' : 'FAIL'} · {result.model.replace('opencode/', '')}</div>
+                        <pre>{result.ok ? (result.text ?? '').slice(0, 160) : (result.error ?? 'unknown error')}</pre>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>

@@ -107,3 +107,5 @@ form.inline { display: inline; }
   .conversation { max-height: none; }
   .session-list { max-height: 180px; }
 }
+
+code { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }

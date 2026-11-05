@@ -8,8 +8,15 @@
  * See docs/ARCHITECTURE.md for the Vercel constraints and the smallest change
  * (a Vercel Sandbox adapter) that would remove the function-bundle blocker.
  */
-export { openCodeCliAdapter, probeOpenCode, runOpenCodeAgent } from './opencode-cli';
-export { resolveOpenCodeBinary, buildChildEnv, extractAssistantText, redactSecrets } from './opencode-cli';
+export { openCodeCliAdapter, probeOpenCode, runOpenCodeAgent, runOpenCodeSmokeTest } from './opencode-cli';
+export {
+  resolveOpenCodeBinary,
+  buildChildEnv,
+  extractAssistantText,
+  redactSecrets,
+  writeWorkspaceOpenCodeConfig,
+} from './opencode-cli';
+export type { ModelSmokeResult } from './opencode-cli';
 export type {
   AgentRunRequest,
   AgentRunResult,
