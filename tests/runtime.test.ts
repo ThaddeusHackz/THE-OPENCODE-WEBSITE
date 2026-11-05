@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { configStatus, readServerEnv } from '../src/lib/env';
-import { buildChildEnv, extractAssistantText, redactSecrets, resolveOpenCodeBinary } from '../src/lib/runtime/opencode-cli';
+import { assertModelKeysConfigured, buildChildEnv, extractAssistantText, redactSecrets, resolveOpenCodeBinary } from '../src/lib/runtime/opencode-cli';
+import { DEFAULT_FREE_MODEL } from '../src/lib/models';
 import { diffSnapshots, unifiedDiff, type FileSnapshot } from '../src/lib/workspace';
 
 const workspace = {
@@ -32,6 +33,29 @@ describe('runtime adapter boundary', () => {
     expect(env.GITHUB_APP_ID).toBeUndefined();
     expect(env.HOME).toBe('/tmp/ws/home');
     expect(env.XDG_STATE_HOME).toBe('/tmp/ws/xdg/state');
+    expect(env.OPENCODE_DISABLE_FREE_MODELS).toBe('1');
+  });
+
+  it('exposes the Vercel OIDC token to the normal vercel provider only', () => {
+    const env = buildChildEnv(workspace, {
+      PATH: '/bin',
+      VERCEL_OIDC_TOKEN: 'oidc-secret',
+      GITHUB_TOKEN: 'github-secret',
+      SUPABASE_SERVICE_ROLE_KEY: 'db-secret',
+    });
+    expect(env.AI_GATEWAY_API_KEY).toBe('oidc-secret');
+    expect(env.VERCEL_OIDC_TOKEN).toBe('oidc-secret');
+    expect(env.GITHUB_TOKEN).toBeUndefined();
+    expect(env.SUPABASE_SERVICE_ROLE_KEY).toBeUndefined();
+  });
+
+  it('fails honestly when the selected normal free model has no credential', () => {
+    expect(() =>
+      assertModelKeysConfigured('amd/DeepSeek-V4.1-Flash', {}),
+    ).toThrow(/AMD_API_KEY/);
+    expect(() =>
+      assertModelKeysConfigured(DEFAULT_FREE_MODEL, { VERCEL_OIDC_TOKEN: 'oidc' }),
+    ).not.toThrow();
   });
 
   it('parses real OpenCode JSON events and errors', () => {

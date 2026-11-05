@@ -1,4 +1,12 @@
 # Real Vercel Function proof of concept — result
+> **Historical note (read first).** The sections below describe the original
+> **OpenCode Zen** proof of concept (`opencode/*` free models) and its live
+> verification. That path was **rejected**: every Zen free model returned
+> `provider.free-limit` HTTP 429. The **current build uses normal free models
+> from ordinary providers** (`models.dev`), keyless on Vercel via the automatic
+> `VERCEL_OIDC_TOKEN`. See [FREE_MODELS.md](FREE_MODELS.md) and
+> [the fifth deployment in VERCEL_POC.md](VERCEL_POC.md). The binary, function,
+> Supabase/RLS, and GitHub findings below remain valid infrastructure facts.
 
 **Result: the actual OpenCode v2.2.5 binary DID run inside a deployed Vercel Node.js Function.**
 

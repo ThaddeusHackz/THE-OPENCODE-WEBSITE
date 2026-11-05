@@ -22,17 +22,27 @@ type ConfigStatus = {
   model: string;
   freeModel: boolean;
   modelTestsEnabled: boolean;
+  catalog: 'normal';
+  modelEnvKeys: string[];
+  missingModelEnvKeys: string[];
+  modelKeyConfigured: boolean;
+  keylessOnVercel: boolean;
+  vercelOidcConfigured: boolean;
+  disableZenFreeModels: boolean;
   missing: string[];
   setupMessage: string;
 };
 
 type FreeModel = {
+  provider: string;
   id: string;
   fullId: string;
   name: string;
   context: number;
   output: number;
-  requiresKey: false;
+  cost: 0;
+  envKeys: string[];
+  keylessOnVercel: boolean;
   preferred: boolean;
 };
 
@@ -137,9 +147,9 @@ export default function App() {
   const [probe, setProbe] = useState<ProbeResult | null>(null);
   const [probing, setProbing] = useState(false);
   const [models, setModels] = useState<FreeModel[]>([]);
-  const [catalogSource, setCatalogSource] = useState<'live' | 'snapshot'>('snapshot');
+  const [catalogSource, setCatalogSource] = useState('OpenCode models.dev');
   const [catalogNote, setCatalogNote] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState('opencode/deepseek-v4.1-flash-free');
+  const [selectedModel, setSelectedModel] = useState('vercel/reflection/beam-free');
   const [modelTests, setModelTests] = useState<ModelTestResult[]>([]);
   const [testing, setTesting] = useState(false);
   const [testingAll, setTestingAll] = useState(false);
@@ -156,7 +166,14 @@ export default function App() {
       const [meRes, configRes, modelsRes] = await Promise.all([
         api<MeResponse>('/api/me'),
         api<ConfigStatus>('/api/config'),
-        api<{ models: FreeModel[]; configuredModel: string; source: 'live' | 'snapshot'; note: string | null; count: number }>('/api/models'),
+        api<{
+          models: FreeModel[];
+          configuredModel: string;
+          source: string;
+          note: string | null;
+          count: number;
+          keylessOnVercel: number;
+        }>('/api/models'),
       ]);
       setMe(meRes);
       setConfig(configRes);
@@ -168,7 +185,7 @@ export default function App() {
           ? current
           : (modelsRes.models.some((model) => model.fullId === modelsRes.configuredModel)
               ? modelsRes.configuredModel
-              : (modelsRes.models[0]?.fullId ?? 'opencode/deepseek-v4.1-flash-free')),
+              : (modelsRes.models[0]?.fullId ?? 'vercel/reflection/beam-free')),
       );
       if (!meRes.user) {
         setSessions([]);
@@ -305,10 +322,12 @@ export default function App() {
     }
   };
 
-  const testAllModels = async () => {
+  /** Verify the preferred normal free models (keyless Vercel ones first). */
+  const testPreferredModels = async () => {
     setTestingAll(true);
     setModelTests([]);
-    for (const model of models) {
+    const picks = models.filter((model) => model.preferred || model.keylessOnVercel).slice(0, 12);
+    for (const model of picks) {
       await testModel(model.fullId);
     }
     setTestingAll(false);
@@ -381,8 +400,15 @@ export default function App() {
         {config && (
           <div className="notice">
             <strong>Model:</strong> <code>{config.model}</code> —{' '}
-            {config.freeModel ? 'official free OpenCode Zen model, no API key needed' : 'requires a provider key'}.
-            GitHub access: <code>{config.githubMode}</code>. {models.length} free models available.
+            {config.keylessOnVercel
+              ? 'normal free model via Vercel AI Gateway, keyless with the automatic OIDC token'
+              : config.freeModel
+                ? `normal free model (needs ${config.modelEnvKeys.join(' or ')} as a server-side env var)`
+                : 'requires a provider key'}.
+            {!config.modelKeyConfigured && config.missingModelEnvKeys.length > 0 && (
+              <> <strong>Missing:</strong> <code>{config.missingModelEnvKeys.join(' or ')}</code>.</>
+            )}{' '}
+            GitHub access: <code>{config.githubMode}</code>. {models.length} normal free models; OpenCode Zen is disabled.
           </div>
         )}
         {repoError && <div className="notice warn">Repository list unavailable: {repoError}</div>}
@@ -417,23 +443,25 @@ export default function App() {
           </div>
 
           <div className="card">
-            <h2>Model (official free OpenCode Zen)</h2>
+            <h2>Model (normal free models)</h2>
             {models.length === 0 ? (
               <div className="empty">Model catalog unavailable.</div>
             ) : (
               <>
                 <div className="field">
-                  <label htmlFor="model">Free model — no API key required</label>
+                  <label htmlFor="model">Zero-cost model from an ordinary provider</label>
                   <select id="model" value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
                     {models.map((model) => (
                       <option key={model.fullId} value={model.fullId}>
-                        {model.name}{model.preferred ? ' ★' : ''}
+                        {model.provider} · {model.name}
+                        {model.keylessOnVercel ? ' (keyless on Vercel)' : ` (needs ${model.envKeys.join(' or ')})`}
+                        {model.preferred ? ' ★' : ''}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="hint">
-                  {models.length} free models · {catalogSource === 'live' ? 'live official catalog' : 'bundled snapshot'}.
+                  {models.length} normal free models · {catalogSource}.
                   {catalogNote ? ` ${catalogNote}` : ''}
                 </div>
                 {config?.modelTestsEnabled ? (
@@ -441,8 +469,8 @@ export default function App() {
                     <button className="btn small" type="button" onClick={() => void testModel(selectedModel)} disabled={testing || testingAll}>
                       {testing ? <><span className="spinner" /> Testing…</> : 'Test this model'}
                     </button>
-                    <button className="btn small ghost" type="button" onClick={() => void testAllModels()} disabled={testing || testingAll}>
-                      {testingAll ? <><span className="spinner" /> Testing all…</> : 'Test all free models'}
+                    <button className="btn small ghost" type="button" onClick={() => void testPreferredModels()} disabled={testing || testingAll}>
+                      {testingAll ? <><span className="spinner" /> Testing…</> : 'Test preferred free models'}
                     </button>
                   </div>
                 ) : (
@@ -452,7 +480,7 @@ export default function App() {
                   <div className="session-list" style={{ marginTop: 10, maxHeight: 220 }}>
                     {modelTests.map((result) => (
                       <div key={result.model} className={`msg ${result.ok ? 'assistant' : 'system'}`} style={{ padding: '7px 9px' }}>
-                        <div className="who">{result.ok ? 'PASS' : 'FAIL'} · {result.model.replace('opencode/', '')}</div>
+                        <div className="who">{result.ok ? 'PASS' : 'FAIL'} · {result.model}</div>
                         <pre>{result.ok ? (result.text ?? '').slice(0, 160) : (result.error ?? 'unknown error')}</pre>
                         {result.quota ? <div className="who">Upstream free quota · retry in ~{result.quota.retryAfterHours} h</div> : null}
                       </div>

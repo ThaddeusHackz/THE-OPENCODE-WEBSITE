@@ -10,10 +10,10 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 /**
- * Real verification of one official free model: spawns the actual OpenCode CLI
+ * Real verification of one NORMAL free model: spawns the actual OpenCode CLI
  * with `--standalone run` in a fresh /tmp workspace and a fixed tiny prompt.
  * Returns the real assistant text or the real error. Never a fake reply.
- * Gated by ENABLE_MODEL_TESTS=1 so it is not an open ended free-quota endpoint.
+ * Gated by ENABLE_MODEL_TESTS=1 so it is not an open-ended anonymous endpoint.
  */
 async function handle(request: NextRequest) {
   try {

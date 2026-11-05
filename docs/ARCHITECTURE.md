@@ -1,4 +1,12 @@
 # Architecture, Vercel constraints and the runtime adapter boundary
+> **Historical note (read first).** The sections below describe the original
+> **OpenCode Zen** proof of concept (`opencode/*` free models) and its live
+> verification. That path was **rejected**: every Zen free model returned
+> `provider.free-limit` HTTP 429. The **current build uses normal free models
+> from ordinary providers** (`models.dev`), keyless on Vercel via the automatic
+> `VERCEL_OIDC_TOKEN`. See [FREE_MODELS.md](FREE_MODELS.md) and
+> [the fifth deployment in VERCEL_POC.md](VERCEL_POC.md). The binary, function,
+> Supabase/RLS, and GitHub findings below remain valid infrastructure facts.
 
 ## 1. What was verified from official documentation
 
@@ -87,14 +95,15 @@ interface RuntimeAdapter {
 }
 ```
 
-There is **no mock adapter, no fallback coding model, and no simulated reply**. Free
-`opencode/*` models need no provider key; any other model does. When the binary is missing the
-API returns `OPENCODE_RUNTIME_NOT_FOUND`; when a non-free model has no key it returns
-`OPENCODE_NOT_CONFIGURED`. A browser-supplied `model` is validated against the official free
-catalog / the configured model before it reaches the CLI, so there is no silent switch. Real
-upstream errors (`provider.free-limit`, `provider.no-route`, `AGENT_TIMEOUT`) are surfaced and
-recorded as `system` messages. A `VercelSandboxAdapter` could implement the same interface in
-the future without changing any route or UI code.
+There is **no mock adapter, no fallback coding model, and no simulated reply**. In the current
+build the catalog is **normal (non-Zen) free models**; each declares the credential env var
+NAME it needs, and `vercel/*` models are satisfied by Vercel's automatic OIDC token. When the
+binary is missing the API returns `OPENCODE_RUNTIME_NOT_FOUND`; when the chosen model's key is
+absent it returns `OPENCODE_NOT_CONFIGURED` with the exact missing env name. A browser-supplied
+`model` is validated against the catalog / the configured model before it reaches the CLI, so
+there is no silent switch. Real upstream errors (`provider.free-limit`, `provider.no-route`,
+`AGENT_TIMEOUT`) are surfaced and recorded as `system` messages. A `VercelSandboxAdapter`
+could implement the same interface in the future without changing any route or UI code.
 
 ## 4. Runtime blockers: resolved vs remaining
 
@@ -122,13 +131,11 @@ commit `c80b210` and later):
 
 **Remaining (external / not in this repo's control):**
 
-1. **Upstream free quota (primary blocker).** A real full `opencode run` on Vercel with
-   `opencode/deepseek-v4.1-flash-free` reached OpenCode Zen and returned
-   `provider.free-limit` / HTTP 429 `Free usage limit reached` with
-   `retryAfterMs ≈ 80,000,000` (~22 h). Other routable free models returned the same 429;
-   retired ids return `provider.no-route` ("Model unavailable"). **No successful assistant
-   answer exists yet**, and none was faked. Waiting for the quota reset, subscribing to
-   OpenCode Go, or setting a provider key with a non-free model are the only honest fixes.
+1. **Upstream Zen free quota — HISTORICAL, now avoided.** All live `opencode/*` free models
+   returned `provider.free-limit` / HTTP 429 (~22 h). The product path was therefore changed
+   to normal free models from ordinary providers, with `OPENCODE_DISABLE_FREE_MODELS=1`
+   removing Zen models from the child process. Free providers can still have their own
+   rate limits; the app reports them honestly rather than fabricating a reply.
 2. **Duration.** A single HTTP request must finish within `maxDuration` (300 s Hobby).
    Long runs return `AGENT_TIMEOUT` (or Vercel's 504) instead of a partial fake answer.
    A `VercelSandboxAdapter` (microVM) is the production path for multi-minute runs.
@@ -141,8 +148,9 @@ commit `c80b210` and later):
    sensitive Vercel env var.
 
 So: **the actual OpenCode binary ran a full model-backed `opencode run` on Vercel** and the
-whole chain (Function → CLI → `--standalone` → Zen request → NDJSON error) is proven. What is
-**not** proven is a successful assistant answer, because the upstream free tier is exhausted.
+whole chain (Function → CLI → `--standalone` → upstream request → NDJSON error) is proven.
+The Zen-era runs never produced a successful assistant answer because that free tier was
+exhausted; the normal-model build is verified separately in the fifth deployment notes.
 
 ## 5. Smallest change that completes the end-to-end agent run
 

@@ -1,4 +1,12 @@
 # Setup instructions
+> **Historical note (read first).** The sections below describe the original
+> **OpenCode Zen** proof of concept (`opencode/*` free models) and its live
+> verification. That path was **rejected**: every Zen free model returned
+> `provider.free-limit` HTTP 429. The **current build uses normal free models
+> from ordinary providers** (`models.dev`), keyless on Vercel via the automatic
+> `VERCEL_OIDC_TOKEN`. See [FREE_MODELS.md](FREE_MODELS.md) and
+> [the fifth deployment in VERCEL_POC.md](VERCEL_POC.md). The binary, function,
+> Supabase/RLS, and GitHub findings below remain valid infrastructure facts.
 
 All secrets are set **only** in server-side environment variables (Vercel Project Settings →
 Environment Variables, or `.env.local` locally). `.env.example` lists names and descriptions
@@ -70,19 +78,24 @@ For this website:
   platform binary is installed on Vercel's Linux x64 builders. `next.config.ts` includes it in
   `outputFileTracingIncludes` for the two server functions.
 - Optionally set `OPENCODE_BINARY_PATH` to an absolute path of an already-provisioned binary.
-- `OPENCODE_MODEL` defaults to the official free
-  `opencode/deepseek-v4.1-flash-free`, which needs **no** provider key. `GET /api/models`
-  returns every zero-cost model from the live official catalog. The UI lets the user choose
-  one; `validateModel()` rejects arbitrary model strings and there is no silent fallback.
-- For a **non-free** model (`anthropic/claude-sonnet-4-5`, etc.) set **at least one**
-  model-provider key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …). Keys are passed to the child
-  process only, never to the browser, and are redacted from captured output.
-- Set `ENABLE_MODEL_TESTS=1` to enable `GET/POST /api/models/test?model=opencode/<id>`, which
+- `OPENCODE_MODEL` defaults to the normal free model `vercel/reflection/beam-free`, which
+  needs **no new API key** on Vercel: OpenCode's `vercel-ai-gateway` provider uses the
+  automatically injected `VERCEL_OIDC_TOKEN` (aliased to `AI_GATEWAY_API_KEY` in the child).
+  Locally, set `AI_GATEWAY_API_KEY` yourself; `/api/config` reports the missing token.
+- `GET /api/models` returns **214 normal free models from 45 ordinary providers**, validated
+  against the pinned CLI v2.2.5. Each model lists its required credential env var NAME. Zen
+  (`opencode/*`) is excluded and `OPENCODE_DISABLE_FREE_MODELS=1` disables it in the CLI.
+- For any normal free model other than `vercel/*`, set that provider's free key (e.g.
+  `OPENROUTER_API_KEY`, `AMD_API_KEY`, `NVIDIA_API_KEY`, `GROQ_API_KEY`, `HF_TOKEN`) as a
+  sensitive Vercel env var. Keys are passed to the child process only, never to the browser,
+  and are redacted from captured output. `/api/config` names exactly what is missing.
+- `OPENCODE_MODEL` pointing at an old Zen id is ignored (falls back to the default) rather
+  than silently running Zen.
+- Set `ENABLE_MODEL_TESTS=1` to enable `GET/POST /api/models/test?model=<provider>/<id>`, which
   spawns the real CLI with a tiny prompt and returns the real answer or real upstream error.
-  Disable it when not needed so the free quota is not consumed by anonymous traffic.
-- **Free-tier caveat:** OpenCode's free models are promotional and rate-limited. The real PoC
-  run returned `provider.free-limit` / HTTP 429 with `retryAfterMs ≈ 80,000,000`. That is an
-  upstream quota, not a code bug; see `docs/FREE_MODELS.md` and `docs/VERCEL_POC.md`.
+  Disable it when not needed so free quota is not consumed by anonymous traffic.
+- **Free-tier caveat:** free models are promotional and rate-limited by their own providers.
+  Zen's `provider.free-limit` 429 is historical; see `docs/FREE_MODELS.md`.
 - Set `OPENCODE_TIMEOUT_MS` below your function's `maxDuration`. Defaults: 240 000 ms,
   `maxDuration = 300` (Hobby). Pro/Enterprise can raise `maxDuration` to 800.
 - `OPENCODE_MAX_REPO_BYTES` (default 50 MB) and `OPENCODE_MAX_OUTPUT_BYTES` (default 200 KB)

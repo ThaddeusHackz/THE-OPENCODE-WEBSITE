@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '../errors';
 import { PROVIDER_KEY_NAMES, readServerEnv } from '../env';
-import { DEFAULT_FREE_MODEL, validateModel } from '../models';
+import { DEFAULT_FREE_MODEL, isFreeModel, missingEnvKeysFor, validateModel } from '../models';
 import {
   diffSnapshots,
   snapshotFiles,
@@ -59,7 +59,35 @@ export function buildChildEnv(
     const value = source[name];
     if (value) env[name] = value;
   }
+  // OpenCode's vercel-ai-gateway provider accepts AI_GATEWAY_API_KEY or
+  // VERCEL_OIDC_TOKEN. Vercel injects the OIDC token into Functions, so expose
+  // it under both names: the `vercel` provider becomes enabled and can
+  // authenticate to normal free models without any user-supplied key.
+  if (source.VERCEL_OIDC_TOKEN && !env.AI_GATEWAY_API_KEY) {
+    env.AI_GATEWAY_API_KEY = source.VERCEL_OIDC_TOKEN;
+  }
+  // OpenCode's `opencode` / `opencode-go` promotional free tier is disabled:
+  // those Zen models returned `provider.free-limit` (HTTP 429).
+  env.OPENCODE_DISABLE_FREE_MODELS = source.OPENCODE_DISABLE_FREE_MODELS === '0' ? '0' : '1';
   return env;
+}
+
+/** Fail honestly when the selected normal free model has no credential. */
+export function assertModelKeysConfigured(
+  model: string,
+  source: Record<string, string | undefined> = process.env,
+): void {
+  const missing = isFreeModel(model)
+    ? missingEnvKeysFor(model, source)
+    : PROVIDER_KEY_NAMES.some((name) => Boolean(source[name]))
+      ? []
+      : ['one model-provider key'];
+  if (missing.length === 0) return;
+  throw new AppError(
+    503,
+    'OPENCODE_NOT_CONFIGURED',
+    `Missing credential for ${model}: ${missing.join(' or ')}. Set it as a server-side environment variable (never in the browser or repo). No reply was generated.`,
+  );
 }
 
 /** Replace any host secret-looking value before output is stored or returned. */
@@ -271,14 +299,7 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
   } catch (error) {
     throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
   }
-  // Official OpenCode Zen free models work signed out; everything else needs a key.
-  if (!model.startsWith('opencode/') && cfg.providerKeyNames.length === 0) {
-    throw new AppError(
-      503,
-      'OPENCODE_NOT_CONFIGURED',
-      'A model-provider key is required for a non-free model. No reply was generated.',
-    );
-  }
+  assertModelKeysConfigured(model);
 
   await writeWorkspaceOpenCodeConfig(request.workspace.repo, model);
   const before = await snapshotFiles(request.workspace.repo);
@@ -330,7 +351,7 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
   };
 }
 
-/** Real, tiny model-backed run used to verify an official free model works. */
+/** Real, tiny model-backed run used to verify a normal free model works. */
 export type ModelSmokeResult = {
   ok: boolean;
   runtimeId: 'opencode-cli';
@@ -357,9 +378,7 @@ export async function runOpenCodeSmokeTest(requestedModel: string): Promise<Mode
   } catch (error) {
     throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
   }
-  if (!model.startsWith('opencode/') && cfg.providerKeyNames.length === 0) {
-    throw new AppError(503, 'OPENCODE_NOT_CONFIGURED', 'A model-provider key is required for a non-free model.');
-  }
+  assertModelKeysConfigured(model);
   return withTempWorkspace(async (workspace) => {
     await writeWorkspaceOpenCodeConfig(workspace.repo, model);
     await writeFile(path.join(workspace.repo, 'README.md'), '# free-model smoke test\n', 'utf8');
