@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '../errors';
 import { PROVIDER_KEY_NAMES, readServerEnv } from '../env';
-import { DEFAULT_FREE_MODEL, isFreeOpenCodeModel, validateModel } from '../models';
+import { DEFAULT_FREE_MODEL, validateModel } from '../models';
 import {
   diffSnapshots,
   snapshotFiles,
@@ -272,7 +272,7 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
     throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
   }
   // Official OpenCode Zen free models work signed out; everything else needs a key.
-  if (!isFreeOpenCodeModel(model) && cfg.providerKeyNames.length === 0) {
+  if (!model.startsWith('opencode/') && cfg.providerKeyNames.length === 0) {
     throw new AppError(
       503,
       'OPENCODE_NOT_CONFIGURED',
@@ -357,7 +357,7 @@ export async function runOpenCodeSmokeTest(requestedModel: string): Promise<Mode
   } catch (error) {
     throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
   }
-  if (!isFreeOpenCodeModel(model) && cfg.providerKeyNames.length === 0) {
+  if (!model.startsWith('opencode/') && cfg.providerKeyNames.length === 0) {
     throw new AppError(503, 'OPENCODE_NOT_CONFIGURED', 'A model-provider key is required for a non-free model.');
   }
   return withTempWorkspace(async (workspace) => {

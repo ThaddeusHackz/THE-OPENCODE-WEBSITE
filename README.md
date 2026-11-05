@@ -20,7 +20,7 @@ workspace. It is **not** a persistent cloud development environment.
 | Supabase `agent_sessions` / `agent_messages` with RLS | Migration applied remotely and verified (4 policies per table) — `docs/SUPABASE.md` |
 | Least-privilege GitHub App repo access, **plus a server-side PAT fallback** | Implemented; App preferred. The supplied PAT is stored as a Vercel sensitive env var |
 | Per-request ephemeral `/tmp` workspace, path-traversal & size guards | Implemented |
-| **47 official free OpenCode Zen models** (incl. DeepSeek V4.1 Flash Free), live catalog refresh, model selector, real per-model verification route | Implemented — `docs/FREE_MODELS.md` |
+| Official free OpenCode Zen models (incl. DeepSeek V4.1 Flash Free): 47 in the vetted snapshot, **10 currently live**; live catalog refresh, model selector, real per-model verification route | Implemented — `docs/FREE_MODELS.md` |
 | Responsive UI: sign-in, repo/model selection, conversation, saved sessions, loading/error/empty states | Implemented |
 | Real OpenCode CLI runtime adapter (`opencode run --standalone`) | Implemented. **The real binary ran a full model-backed `opencode run` on Vercel** — upstream returned a real `provider.free-limit` (HTTP 429) |
 | REA MCP server `rea` | Installed & verified locally — `docs/REA.md` |
@@ -33,7 +33,8 @@ workspace. It is **not** a persistent cloud development environment.
   `/var/task/node_modules/@opencode/cli-linux-x64/bin/opencode`.
 - `GET /api/config` → `supabaseConfigured: true`, `githubMode: "pat"`,
   `openCodeConfigured: true`, `freeModel: true`, `missing: []`.
-- `GET /api/models` → the live official zero-cost catalog (47 models in the vetted snapshot).
+- `GET /api/models` → the **live** official zero-cost catalog: 10 free chat models at the time of
+  verification (`source: "live"`); 47 are retained in the vetted snapshot fallback.
 - `GET /api/models/test?model=opencode/deepseek-v4.1-flash-free` → the real CLI spawned, the
   real Zen endpoint was called, and the real upstream answer was
   `provider.free-limit` / HTTP 429 `Free usage limit reached` with `retryAfterMs ≈ 80,000,000`.

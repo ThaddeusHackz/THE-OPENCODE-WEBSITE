@@ -9,7 +9,8 @@
 - `docs/providers` (`https://opencode.ai/v2/docs/providers`) confirms the catalog comes from models.dev and that providers are referenced as `providerID/modelID`.
 - `https://opencode.ai/v2/docs/console/go` notes free listings are promotional and can change.
 
-`src/lib/models.ts` was generated from that official catalog: **47 free models**, each with
+`src/lib/models.ts` was generated from the bundled official catalog snapshot: **47 free
+models**, each with
 `id`, `fullId` (`opencode/<id>`), display name, context window and output limit. No OpenCode
 core source code is copied — only public model metadata. `GET /api/models` returns the catalog.
 
@@ -90,3 +91,18 @@ Therefore "all the free models work perfectly" cannot honestly be claimed: the i
 complete and verified up to the upstream gateway, but the external free tier is exhausted.
 Every result shown in the UI is a real one. When the quota resets — or with OpenCode Go or a
 provider key — the same route returns the real model text without any code change.
+
+## Live official catalog at verification time
+
+`GET /api/models` returned `source: "live"`, `count: 10`, `fetchedAt: 2026-11-05T02:48:27Z`:
+
+`big-pickle`, `deepseek-v4.1-flash-free`, `glm-5.3-flash-free`, `beam-free`,
+`crouton-alpha-free`, `flint-40b-free`, `mimo-v2.6-flash-free`,
+`nemotron-3.5-lightning-free`, `nemotron-3.5-super-vl-free`, `pulse-alpha-free`.
+
+The other 37 ids in the bundled snapshot are no longer zero-cost/available on the live
+gateway — real runs returned `provider.no-route` for several of them (`mimo-v2.5-free`,
+`nemotron-3-ultra-free`, `north-mini-code-free`, `grok-code`). Showing the snapshot as if all
+47 were selectable would be misleading, so `/api/models` prefers the live list. Newly added
+`opencode/*` ids are accepted by `validateModel()` and, after a fix, are correctly treated as
+key-free by both `runOpenCodeAgent()` and `runOpenCodeSmokeTest()`.

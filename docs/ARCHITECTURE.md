@@ -117,7 +117,7 @@ commit `c80b210` and later):
 | No model configured | `OPENCODE_MODEL=opencode/deepseek-v4.1-flash-free`; `configStatus()` returns `openCodeConfigured: true`, `freeModel: true`, `missing: []` from the live site |
 | No GitHub access | Server-side fine-grained PAT fallback added (App still preferred); live `githubMode: "pat"` |
 | No Supabase | Publishable key + project URL set; migration applied and verified; redirect allowlist extended |
-| Free model catalog stale | `/api/models` now reads the **live** official catalog with a vetted snapshot fallback |
+| Free model catalog stale | `/api/models` now reads the **live** official catalog (10 zero-cost chat models at verification time) with the 47-model snapshot fallback; a newly added id is treated as free and needs no key |
 | No way to verify each free model | `GET/POST /api/models/test?model=opencode/<id>` runs the real CLI with a tiny prompt and returns the real text or real error |
 
 **Remaining (external / not in this repo's control):**

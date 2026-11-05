@@ -209,3 +209,48 @@ results. No model returned `ok: true`.
   client id/secret). See `docs/SUPABASE.md`.
 - Rotate/revoke the fine-grained PAT that was pasted in chat.
 - Optional: `VercelSandboxAdapter` for multi-minute runs; write-back remains deliberately off.
+
+## Third deployment — live catalog refresh
+
+`dpl_C8KZNeJfUzyfMX3BS5bN85hdVk9Z`, git ref pinned to commit
+`456615bd176e4209d68b7598e96903d3cc4e4149`. This deployment replaces the static
+47-model list in `/api/models` with a live read of `https://opencode.ai/zen/v1/models`
+(snapshot fallback), relaxes `validateModel()` for newly added official free ids, adds quota
+metadata to `/api/models/test` results, and records the real 429 findings in the docs.
+
+## Third deployment verification — all 10 live free models
+
+`GET /api/models?v=20261105c` on `dpl_C8KZNeJfUzyfMX3BS5bN85hdVk9Z` returned
+`source: "live"`, `count: 10`:
+
+```
+big-pickle, deepseek-v4.1-flash-free, glm-5.3-flash-free, beam-free,
+crouton-alpha-free, flint-40b-free, mimo-v2.6-flash-free,
+nemotron-3.5-lightning-free, nemotron-3.5-super-vl-free, pulse-alpha-free
+```
+
+Each was run through `GET /api/models/test?model=opencode/<id>` (real CLI, real Zen request,
+tiny prompt "Reply with the single word OK."). Real results:
+
+| Live free model | Result |
+|---|---|
+| `big-pickle` | HTTP 429 `provider.free-limit`, ~21.7 h retry |
+| `deepseek-v4.1-flash-free` | HTTP 429 `provider.free-limit`, ~22.2 h retry |
+| `glm-5.3-flash-free` | HTTP 429 `provider.free-limit`, ~21.7 h retry |
+| `beam-free` | HTTP 429 `provider.free-limit`, ~21.7 h retry |
+| `flint-40b-free` | HTTP 429 `provider.free-limit`, `retryAfterMs: 77635000` (21.6 h) |
+| `mimo-v2.6-flash-free` | HTTP 429 `provider.free-limit`, `retryAfterMs: 77637000` (21.6 h) |
+| `nemotron-3.5-lightning-free` | HTTP 429 `provider.free-limit`, `retryAfterMs: 77610000` (21.6 h) |
+| `nemotron-3.5-super-vl-free` | HTTP 429 `provider.free-limit`, `retryAfterMs: 77609000` (21.6 h) |
+| `crouton-alpha-free` | Initially `OPENCODE_NOT_CONFIGURED` (bug: a new live id was not in the 47-id snapshot, so the adapter wrongly demanded a provider key). Fixed to treat every `opencode/*` id as free |
+| `pulse-alpha-free` | Same bug class; fixed in the same change |
+
+**No model produced a successful assistant answer.** The quota error is uniform across every
+routable free model, indicating a deployment/account-wide free-tier limit rather than a
+per-model issue. The quota metadata is now returned explicitly, e.g.:
+
+```json
+{"ok":false,"model":"opencode/flint-40b-free","error":"OPENCODE_FREE_LIMIT: Free usage limit reached. ... Retry in about 21.6 h.","exitCode":1,"durationMs":5792,"quota":{"retryAfterMs":77635000,"retryAfterHours":21.6}}
+```
+
+No reply was fabricated, no model was silently switched, and no provider key was invented.

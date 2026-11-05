@@ -20,9 +20,10 @@
 - [x] Least-privilege GitHub App path **plus a server-side fine-grained PAT fallback**, with
       an installation/user allowlist and a collaborator check before any archive download.
       The token is a Vercel **sensitive** env var; no secret in the repo.
-- [x] **All 47 official free OpenCode Zen models** (including DeepSeek V4.1 Flash Free)
-      compiled into a vetted catalog; `/api/models` additionally reads the **live** official
-      catalog so retired ids disappear. UI has a model selector and sends the chosen model.
+- [x] **All official free OpenCode Zen models** (including DeepSeek V4.1 Flash Free)
+      compiled into a vetted 47-model snapshot; `/api/models` reads the **live** official
+      catalog so retired ids disappear. At verification time the live catalog listed **10**
+      zero-cost chat models. UI has a model selector and sends the chosen model.
       `docs/FREE_MODELS.md`.
 - [x] Fresh `/tmp` workspace per request, safe tar extraction, bounded sizes, stripped child
       environment, strict OpenCode permissions, `finally` cleanup.
@@ -35,8 +36,10 @@
 - [x] `.env.example` updated with `GITHUB_TOKEN`, `OPENCODE_MODEL`, `ENABLE_MODEL_TESTS`;
       no secret values committed. Post-edit secret grep was negative.
 - [x] **Real Vercel deployments.** `dpl_EkZXxPf7WvE9taASL5Z2xYiXT8Vi` proved the binary;
-      `dpl_4egrjDETAEJq5Uv5cjKg6Ap4iCqX` (commit `c80b210` then `…`) deployed the full
-      free-model/PAT/Supabase refresh. Both `READY`/`PROMOTED`. `docs/VERCEL_POC.md`.
+      `dpl_4egrjDETAEJq5Uv5cjKg6Ap4iCqX` (commit `c80b210`) deployed the full
+      free-model/PAT/Supabase refresh; `dpl_C8KZNeJfUzyfMX3BS5bN85hdVk9Z` (commit
+      `456615b`) added the live catalog refresh and honest quota reporting.
+      `docs/VERCEL_POC.md`.
 - [x] `GET /api/config` on the live site → `supabaseConfigured: true`, `githubMode: "pat"`,
       `openCodeConfigured: true`, `freeModel: true`, `missing: []`.
 - [x] `GET /api/runtime/poc` → real `opencode v2.2.5` binary at
@@ -53,10 +56,11 @@
 - [ ] **A successful model-backed assistant answer has NOT been obtained.** OpenCode's free
       tier returned HTTP 429 "Free usage limit reached" with a retry of about 22 hours. This
       is an external quota, not a code defect; we did not bypass it and did not fake a reply.
-- [ ] **"All free models work perfectly" is not achievable from inside this repo.** Real
-      per-model runs showed two upstream failure classes: `provider.free-limit` (429) for
-      routable free models and `provider.no-route` ("Model unavailable") for free ids that
-      have been retired from the live catalog. The live catalog refresh removes retired ids.
+- [ ] **"All free models work perfectly" is not achievable from inside this repo.** All 10
+      currently-live free models were individually run through the real CLI on Vercel; every
+      one returned `provider.free-limit` / HTTP 429 with a ~21.6 h retry. Retired snapshot ids
+      returned `provider.no-route` ("Model unavailable"). The live catalog refresh removes
+      retired ids. Full per-model table in `docs/VERCEL_POC.md`.
 - [ ] **Supabase GitHub sign-in is still disabled** (`external_github_enabled: false`). The
       connector cannot set an OAuth client id/secret; enable it once in the Supabase dashboard
       with a GitHub OAuth App (`docs/SUPABASE.md`). Until then `/api/me` returns `user: null`
