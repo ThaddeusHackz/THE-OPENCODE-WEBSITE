@@ -66,3 +66,21 @@ Rather than assuming it applied, the tables were checked with SQL and confirmed 
 `external_github_secret` / `external_github_enabled`, so GitHub sign-in stays a manual
 dashboard step. The PAT used for repository access lives only as a Vercel sensitive env var;
 rotate/revoke it because it was pasted into chat.
+
+## Final verification (2026-11-05)
+
+`execute_query`:
+
+```sql
+select relname, relrowsecurity from pg_class
+where relnamespace = 'public'::regnamespace
+  and relname in ('agent_sessions','agent_messages');
+```
+
+→ `agent_messages: true`, `agent_sessions: true`. RLS is enabled on both tables.
+
+`get_auth_config` re-checked: redirect allowlist holds all original entries plus the three new
+ones; `external_github_enabled: false`, `external_github_client_id: null`,
+`external_github_secret: null`, `site_url: https://anticodex.vercel.app` (unchanged).
+No connector tool exposes the GitHub OAuth provider fields, so this remains a manual
+dashboard step.

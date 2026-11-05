@@ -60,7 +60,9 @@
       currently-live free models were individually run through the real CLI on Vercel; every
       one returned `provider.free-limit` / HTTP 429 with a ~21.6 h retry. Retired snapshot ids
       returned `provider.no-route` ("Model unavailable"). The live catalog refresh removes
-      retired ids. Full per-model table in `docs/VERCEL_POC.md`.
+      retired ids. Full per-model table in `docs/VERCEL_POC.md`. A bug that made two newly
+      added live ids demand a provider key was found and fixed; both were then verified with
+      real runs (also HTTP 429).
 - [ ] **Supabase GitHub sign-in is still disabled** (`external_github_enabled: false`). The
       connector cannot set an OAuth client id/secret; enable it once in the Supabase dashboard
       with a GitHub OAuth App (`docs/SUPABASE.md`). Until then `/api/me` returns `user: null`

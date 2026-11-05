@@ -106,3 +106,11 @@ gateway — real runs returned `provider.no-route` for several of them (`mimo-v2
 47 were selectable would be misleading, so `/api/models` prefers the live list. Newly added
 `opencode/*` ids are accepted by `validateModel()` and, after a fix, are correctly treated as
 key-free by both `runOpenCodeAgent()` and `runOpenCodeSmokeTest()`.
+
+## Final result for all live free models
+
+After fixing the key-free check, all **10** live zero-cost models were verified with real CLI
+runs on the fourth deployment. Every one returned the identical upstream
+`provider.free-limit` HTTP 429 (retry ~21.7 h). The table in `docs/VERCEL_POC.md` lists each
+model's real result. No fake answer exists; the integration is complete and the remaining
+blocker is purely the external free-tier quota.

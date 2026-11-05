@@ -242,8 +242,8 @@ tiny prompt "Reply with the single word OK."). Real results:
 | `mimo-v2.6-flash-free` | HTTP 429 `provider.free-limit`, `retryAfterMs: 77637000` (21.6 h) |
 | `nemotron-3.5-lightning-free` | HTTP 429 `provider.free-limit`, `retryAfterMs: 77610000` (21.6 h) |
 | `nemotron-3.5-super-vl-free` | HTTP 429 `provider.free-limit`, `retryAfterMs: 77609000` (21.6 h) |
-| `crouton-alpha-free` | Initially `OPENCODE_NOT_CONFIGURED` (bug: a new live id was not in the 47-id snapshot, so the adapter wrongly demanded a provider key). Fixed to treat every `opencode/*` id as free |
-| `pulse-alpha-free` | Same bug class; fixed in the same change |
+| `crouton-alpha-free` | Initially `OPENCODE_NOT_CONFIGURED` (bug: a new live id was not in the 47-id snapshot, so the adapter wrongly demanded a provider key). After the fix: real run → HTTP 429 `provider.free-limit`, `retryAfterMs: 78138000` (21.7 h) |
+| `pulse-alpha-free` | Same bug class. After the fix: real run → HTTP 429 `provider.free-limit`, `retryAfterMs: 77988000` (21.7 h) |
 
 **No model produced a successful assistant answer.** The quota error is uniform across every
 routable free model, indicating a deployment/account-wide free-tier limit rather than a
@@ -254,3 +254,24 @@ per-model issue. The quota metadata is now returned explicitly, e.g.:
 ```
 
 No reply was fabricated, no model was silently switched, and no provider key was invented.
+
+## Fourth deployment — key-free fix for new live free ids
+
+`dpl_E8GbeWKg9dcEXFZXi3vsTkPQ28h7`, commit
+`4579ee6bc54f791d25d562d8886e47092cc121ca`. Fixed `runOpenCodeAgent()` and
+`runOpenCodeSmokeTest()` to treat **every** validated `opencode/*` id as free (no provider key
+needed) rather than checking membership in the 47-id bundled snapshot. This resolves the
+`OPENCODE_NOT_CONFIGURED` error seen for newly added live ids such as `crouton-alpha-free` and
+`pulse-alpha-free`.
+
+## Final state of the fourth deployment
+
+`GET /api/config?v=final` → `missing: []`, `githubMode: "pat"`, `freeModel: true`.
+`GET /api/models/test?v=final1&model=opencode/crouton-alpha-free` and
+`...&model=opencode/pulse-alpha-free` both now spawn the real CLI and return the real
+`provider.free-limit` HTTP 429 with quota metadata — confirming the key-free fix works for
+ids that were not in the bundled snapshot.
+
+**All 10 currently-live official free models have now been individually run through the real
+OpenCode CLI on Vercel. Every one returned the same upstream free-tier quota error. There is
+still no successful model-backed assistant answer, and no fake reply has been produced.**
