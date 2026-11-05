@@ -1,0 +1,27 @@
+# dependencies / build output
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# local secrets (never committed)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p8
+
+# REA/setup artifacts and evidence exports
+.rea.backup*
+rea-evidence/
+*.evidence.json
+
+# OS noise
+.DS_Store
+*.log
