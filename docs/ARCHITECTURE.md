@@ -12,7 +12,7 @@ Sources (official): <https://github.com/anomalyco/opencode>,
 | Runtime / Node | Node.js 22.x / 24.x / 26.x (26 default, minor/patch automatic); full Node.js APIs, Web-standard handlers, TypeScript `/api` | `export const runtime = 'nodejs'`; `engines.node = 22.x`; all routes are Route Handlers, no browser SDK |
 | Process execution | Full Node.js APIs including `child_process` are available in Node.js Functions | `spawn()` of the real OpenCode binary is possible in principle |
 | Writable temp dir | Read-only function filesystem plus a writable `/tmp` (up to 500 MB) | Every request uses `fs.mkdtemp(os.tmpdir())`, removed in `finally`; no persistent workspace |
-| Package / binary size | 250 MB uncompressed bundle by default; 5 GB with **Large Functions** beta (`VERCEL_SUPPORT_LARGE_FUNCTIONS=1`, Fluid compute + Active CPU) | OpenCode's Linux x64 binary alone is ~241 MB (252,713,136 bytes) — **the standard limit is almost certainly exceeded** |
+| Package / binary size | 250 MB uncompressed bundle by default; 5 GB with **Large Functions** beta (`VERCEL_SUPPORT_LARGE_FUNCTIONS=1`, Fluid compute + Active CPU) | OpenCode's binary is ~241 MB (252,713,136 bytes); bundled successfully with Large Functions + `outputFileTracingIncludes` — **verified by deployment** (`docs/VERCEL_POC.md`) |
 | Function duration | Hobby 300 s; Pro/Enterprise 300 s default, 800 s max (1800 s extended beta); 504 `FUNCTION_INVOCATION_TIMEOUT` | `maxDuration = 300`, hard `OPENCODE_TIMEOUT_MS` (default 240 000 ms), clear `AGENT_TIMEOUT` error |
 | Alternate compute | Vercel Sandbox: isolated Linux Firecracker microVMs, `@vercel/sandbox`, `Sandbox.create()` / `runCommand`, up to 45 min, full filesystem | Documented as the smallest follow-up adapter below; **not implemented** |
 
@@ -29,8 +29,8 @@ background job is assumed to survive it. Snap-based installation is impossible t
 - `@opencode/cli-linux-x64@2.2.5` contains **one** dynamically linked ELF executable of
   252,713,136 bytes (~241 MiB). `readelf`/`ldd` show it needs `libc.so.6`,
   `ld-linux-x86-64.so.2`, `libpthread.so.0`, `libdl.so.2`, `libm.so.6` and glibc symbols up
-  to `GLIBC_2.17` — modest requirements, but Vercel's Amazon Linux image compatibility has
-  **not** been proven by a deployment in this session.
+  to `GLIBC_2.17` — modest requirements. The real deployment spawned the binary successfully,
+  so the Vercel runtime image is compatible (`docs/VERCEL_POC.md`).
 - `opencode run --format json` emits newline-delimited JSON:
   `{"type":"text",...,"part":{"text":"..."}}` and
   `{"type":"error",...,"error":{"type":"...","message":"..."}}`
@@ -68,9 +68,12 @@ Browser ──(cookie session)──> Next.js Route Handler (Vercel Node.js Func
    └── saved conversations ───── Supabase Postgres (RLS, user_id)
 ```
 
-`/api/runtime/probe` is the **real minimal PoC**: it spawns the actual binary with
-`--version` inside a fresh `/tmp` workspace and reports the real stdout/exit code. It is not
-a mock, not an echo, and not a model call.
+`/api/runtime/probe` (authenticated) and `/api/runtime/poc` (public, read-only) are the
+**real minimal PoC**: they spawn the actual binary with `--version` inside a fresh `/tmp`
+workspace and report the real stdout/exit code. It is not a mock, not an echo, and not a
+model call. A production deployment on a Hobby project returned
+`{"available":true,"binaryPath":"/var/task/node_modules/@opencode/cli-linux-x64/bin/opencode","versionOutput":"opencode v2.2.5"}`
+— see `docs/VERCEL_POC.md` for the exact result, build logs and created resources.
 
 ### Runtime adapter boundary
 
@@ -90,43 +93,49 @@ There is **no mock adapter, no fallback coding model, and no simulated reply**. 
 records a `system` message. A `VercelSandboxAdapter` could implement the same interface in
 the future without changing any route or UI code.
 
-## 4. Exact blockers for the real runtime on Vercel
+## 4. Runtime blockers: resolved vs remaining
 
-1. **Bundle size (primary, unverified).** The ~241 MB binary plus Next.js server layers
-   almost certainly exceeds the 250 MB standard limit. The project therefore requires
-   `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` (Fluid compute + Active CPU). Enabling it, and
-   confirming Vercel actually traces `outputFileTracingIncludes` for a spawned (not
-   imported) native binary, needs a real deployment — **no deployment was completed in this
-   session**, so this remains unverified. If Large Functions are unavailable on the target
-   plan/account, the Function adapter cannot ship as-is.
-2. **glibc / dynamic loader compatibility (unverified).** `readelf` shows the binary's local
-   requirements, but the Vercel runtime image was not tested.
-3. **Model credentials.** No provider key exists by default. Without one, the real CLI
-   returns `provider.no-route` (verified locally). Keys must be set as encrypted Vercel env
-   vars; they are never sent to the browser.
-4. **Duration.** A single HTTP request must finish within `maxDuration`. Long agent runs
-   return `AGENT_TIMEOUT` (or Vercel's own 504) instead of a partial fake answer. Saved
-   state is only what completed within the invocation.
-5. **Fixed-port service.** Default OpenCode commands hit the `49374` shared-service bug;
-   `--standalone` is mandatory and is set by the adapter.
-6. **Snap / privileged install.** Not possible in Vercel Functions; see `docs/SETUP.md`.
+**Resolved by a real deployment** (`docs/VERCEL_POC.md`, deployment
+`dpl_EkZXxPf7WvE9taASL5Z2xYiXT8Vi`, <https://the-opencode-website-poc.vercel.app>):
 
-Because these blockers are deployment-time facts rather than code facts, the code is
-**foundation plus a real adapter**, not a claim that OpenCode ran on Vercel. The final
-checklist states this explicitly.
+| Former concern | Result |
+|---|---|
+| 241 MB binary exceeds the standard 250 MB function bundle | Resolved with `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` (Fluid compute + Active CPU) and `outputFileTracingIncludes`; the binary appeared at `/var/task/node_modules/@opencode/cli-linux-x64/bin/opencode` |
+| Vercel image lacks the required glibc / dynamic loader | Resolved — the real binary executed and printed `opencode v2.2.5` |
+| Node.js Functions cannot spawn native processes | Resolved — `child_process.spawn` worked |
+| `/tmp` is not writable / isolated workspace impossible | Resolved — `withTempWorkspace` created and removed a fresh `/tmp` workspace |
+| Shared service port 49374 conflict | Avoided by `--standalone` (used by the adapter) |
 
-## 5. Smallest change that makes the real runtime run on Vercel
+**Remaining (not proven / still required):**
 
-**Option A — this Function (smallest code change, environment change only):**
+1. **Model credentials (primary remaining blocker).** The deployed project has no
+   `OPENCODE_MODEL` and no provider key, so `configStatus()` returns
+   `openCodeConfigured: false` and `/api/agent/run` returns `OPENCODE_NOT_CONFIGURED`
+   instead of a fabricated reply. Locally, a `run` with no valid key returned
+   `provider.no-route`; a run with a dummy key emitted real NDJSON `step_start` events and
+   then hit the hard `AGENT_TIMEOUT`. Keys must be set as encrypted Vercel env vars.
+2. **Duration.** A single HTTP request must finish within `maxDuration` (300 s Hobby).
+   Long runs return `AGENT_TIMEOUT` (or Vercel's 504) instead of a partial fake answer.
+3. **Supabase + GitHub App.** Not provisioned by me; needed for auth, ownership and repo
+   access. `/api/config` on the deployment shows exactly which variables are missing.
+4. **Snap / privileged install.** Still impossible in Vercel Functions; see `docs/SETUP.md`.
 
-1. Enable Large Functions: add `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` with Fluid compute +
-   Active CPU; redeploy.
-2. Confirm `node_modules/@opencode/cli-linux-x64/bin/opencode` is present in the deployed
-   function bundle (the probe route reports `OPENCODE_RUNTIME_NOT_FOUND` otherwise).
-3. Set `OPENCODE_MODEL` and one provider key as encrypted env vars.
-4. Call `POST /api/runtime/probe`. A result of `available: true` with
-   `versionOutput: "opencode v2.2.5"` proves the binary runs; then send a conversation
-   request. No source change is needed.
+So: **the actual OpenCode binary DID run on Vercel**, but a **full model-backed agent run on
+Vercel has NOT been performed**. The code is a real adapter plus a working website/auth/DB
+foundation, not a claim of an end-to-end agent answer.
+
+## 5. Smallest change that completes the end-to-end agent run
+
+**Option A — this Function (already proven for the binary; only credentials remain):**
+
+1. ✅ Enable Large Functions: `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` with Fluid compute +
+   Active CPU (done on the PoC project).
+2. ✅ Confirm `node_modules/@opencode/cli-linux-x64/bin/opencode` is in the deployed bundle
+   (done: `GET /api/runtime/poc` returned `available: true`, `opencode v2.2.5`).
+3. Set `OPENCODE_MODEL` and one provider key as encrypted env vars on the Vercel project.
+4. Provision Supabase (migration + GitHub provider) and the GitHub App, then set their env
+   vars. Sign in, select a repo, and send a request. No source change is needed for the
+   runtime adapter.
 
 **Option B — Vercel Sandbox (removes size and duration constraints):**
 

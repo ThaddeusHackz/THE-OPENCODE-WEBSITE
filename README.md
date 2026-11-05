@@ -19,7 +19,7 @@ workspace. It is **not** a persistent cloud development environment.
 | Per-request ephemeral `/tmp` workspace, path-traversal & size guards | Implemented |
 | User-owned sessions/messages in Supabase Postgres with RLS | Implemented (migration provided) |
 | Responsive UI: sign-in, repo selection, conversation, saved sessions, loading/error/empty states | Implemented |
-| Real OpenCode CLI runtime adapter (`opencode run --standalone`) | Implemented, **requires deployment provisioning** |
+| Real OpenCode CLI runtime adapter (`opencode run --standalone`) | Implemented; **the actual binary was verified in a deployed Vercel Function** (`--version` PoC). A full model-backed run still needs provider credentials |
 | REA (Reverse Engineer Anything) MCP server `rea` | Installed & verified locally — see `docs/REA.md` |
 | Writing changes back to GitHub | **Deliberately disabled**; explicit-confirmation gate only |
 | Mock / simulated agent replies | **None**, by design |
@@ -40,7 +40,10 @@ Then apply `supabase/migrations/20261105000000_init.sql` in the Supabase SQL edi
 
 - [docs/SETUP.md](docs/SETUP.md) — GitHub App, Supabase, env vars, Vercel deployment.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — runtime adapter boundary, verified Vercel
-  constraints, exactly what blocks the real runtime on Vercel, and the smallest change needed.
+  constraints, resolved vs remaining blockers, and the smallest change needed.
+- [docs/VERCEL_POC.md](docs/VERCEL_POC.md) — **real deployment proof**: the actual OpenCode
+  v2.2.5 binary ran in a Vercel Node.js Function at
+  <https://the-opencode-website-poc.vercel.app/api/runtime/poc>.
 - [docs/REA.md](docs/REA.md) — approved REA setup plan, commands run, verification results, errors.
 - [docs/REVERSE_ENGINEERING.md](docs/REVERSE_ENGINEERING.md) — findings from the official OpenCode
   repository/docs plus the REA static-analysis run.

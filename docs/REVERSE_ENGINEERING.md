@@ -100,5 +100,5 @@ analysis is not a full source reconstruction). Setup/verification details are in
 | MCP config V2 `mcp.servers` | Project `opencode.jsonc` + global config use V2 shape |
 | Permissions are configurable rules | Strict workspace config denies shell/network/subagents/external paths and `.env` reads |
 | Requires model credentials | `configStatus()` gates requests and shows a setup message; no mock |
-| 241 MB binary | `outputFileTracingIncludes` + Large Functions requirement documented in `docs/ARCHITECTURE.md` |
+| 241 MB binary | `outputFileTracingIncludes` + Large Functions; **verified bundled and spawned on Vercel** in `docs/VERCEL_POC.md` |
 | No write-back API used | Diff shown in UI; explicit-confirmation gate; `501` write-back |

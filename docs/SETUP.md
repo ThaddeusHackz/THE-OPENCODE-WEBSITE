@@ -87,14 +87,18 @@ path used here.
 2. Set all environment variables from `.env.example` in Project Settings. Mark the private
    key and model keys as **Sensitive/Encrypted**. Do not set any of them as `NEXT_PUBLIC_*`.
 3. Because the OpenCode binary is ~241 MB, the standard 250 MB uncompressed function bundle
-   limit is likely exceeded. Enable **Large Functions** (Fluid compute + Active CPU): set
+   limit is exceeded. Enable **Large Functions** (Fluid compute + Active CPU): set
    `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` and redeploy. New projects are eligible by default;
-   existing projects must opt in. See `docs/ARCHITECTURE.md`.
+   existing projects must opt in. This was **verified working** on a real Hobby deployment —
+   see `docs/VERCEL_POC.md`.
 4. Set the project's function max duration consistent with `OPENCODE_TIMEOUT_MS`
    (`app/api/agent/run/route.ts` exports `maxDuration = 300`; raise to 800 on Pro).
-5. Deploy. Visit `/`, click **Check real OpenCode runtime** in the footer. If it reports
-   unavailable, read `/api/config` and the notice at the top of the page — the UI will show a
-   setup message rather than a fabricated reply.
+5. Deploy. A real deployment of this branch already exists: see `docs/VERCEL_POC.md`.
+   `GET /api/runtime/poc` is a public, read-only `--version` probe that proves the binary runs;
+   `GET /api/config` lists exactly which variables are still missing. The **Check real OpenCode
+   runtime** button in the footer uses the authenticated `/api/runtime/probe` route and needs a
+   Supabase session. If anything is missing, the UI shows a setup message rather than a
+   fabricated reply.
 6. Add the Vercel domain to Supabase Redirect URLs.
 
 ### Local development
