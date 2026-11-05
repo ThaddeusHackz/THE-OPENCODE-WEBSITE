@@ -1,0 +1,14 @@
+{
+  // Local-only developer tooling. REA is registered as MCP server "rea".
+  // This file contains no credentials and is never read by the website runtime.
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "rea": {
+        "type": "local",
+        "command": ["npx", "-y", "rea-agents@6.8.0", "mcp"],
+        "timeout": 30000
+      }
+    }
+  }
+}
