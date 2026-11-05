@@ -36,8 +36,9 @@ ordinary providers** in OpenCode's own official `models.dev` catalog.
 
 ## Live verification (real HTTP requests, 2026-11-05)
 
-Production deployments: `dpl_65KA1xJZPJmsPfLocSbnpEY7YGth` (`ad961a7`) and
-`dpl_2drJMTFR5qyJm7Q6XZT6eDY5UvYY` (`daa9cc3`), both READY / PROMOTED with the
+Production deployments: `dpl_65KA1xJZPJmsPfLocSbnpEY7YGth` (`ad961a7`),
+`dpl_2drJMTFR5qyJm7Q6XZT6eDY5UvYY` (`daa9cc3`) and the current live build
+`dpl_AWykkkszPnfoGy9xGoTD8B6frJNM` (`809c2e7`) — all READY / PROMOTED with the
 production alias assigned.
 
 | Check | Real result |

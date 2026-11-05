@@ -296,6 +296,7 @@ removed from the product path entirely.
 |---|---|---|
 | `dpl_65KA1xJZPJmsPfLocSbnpEY7YGth` | `ad961a7963b5156413899f801010776e31078ec5` | READY / PROMOTED, `timeToReady: 69992`, production alias assigned. Normal-model catalog shipped. |
 | `dpl_2drJMTFR5qyJm7Q6XZT6eDY5UvYY` | `daa9cc37b883583b75b4464702999a3aa16c8f91` | READY / PROMOTED, `timeToReady: 67834`, production alias assigned. Per-request OIDC header fix. |
+| `dpl_AWykkkszPnfoGy9xGoTD8B6frJNM` | `809c2e7c4a6fa9bc6896775c6562dd59ce85cac9` | READY / PROMOTED, `timeToReady: 84509`, production alias assigned. **Current live build**: actionable `hint` field on real upstream errors; 63 tests. |
 
 Vercel env `OPENCODE_MODEL` is now `vercel/reflection/beam-free` and
 `OPENCODE_DISABLE_FREE_MODELS=1` was added. OIDC Federation is enabled on the
@@ -366,3 +367,9 @@ Vercel env var and select one of the other 209 normal free models.
 No provider key values, OIDC token, GitHub PAT or Supabase service-role key are
 in the browser, logs, workspace or repository. `npm run check` (63 tests),
 `npm run build`, and a credential-pattern scan all pass.
+
+Final live check on `dpl_AWykk...`: `/api/config?v=final` → `missing: []`,
+`vercelOidcConfigured: true`; `/api/models/test?v=final&model=vercel/reflection/beam-free`
+→ real `provider.auth` 403 plus `"hint": "Vercel AI Gateway needs a credit card
+on file to unlock its free credits. Add one in the Vercel dashboard, or choose
+a normal free model and set its provider key."`
