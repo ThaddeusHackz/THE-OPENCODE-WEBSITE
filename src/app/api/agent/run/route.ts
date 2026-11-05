@@ -8,6 +8,7 @@ import { assertRepoAuthorized, listAuthorizedRepositories, resolveGitHubContext 
 import { downloadRepositoryArchive } from '@/lib/github/repos';
 import { jsonError, jsonOk } from '@/lib/http';
 import { probeOpenCode, resolveOpenCodeBinary, runOpenCodeAgent } from '@/lib/runtime';
+import { serverEnvWithOidc } from '@/lib/runtime/credentials';
 import { validateModel } from '@/lib/models';
 import { requireRouteUser } from '@/lib/route-context';
 import { validatePrompt, validateRef, validateRepoFullName, validateSessionId, ValidationError } from '@/lib/validation';
@@ -29,7 +30,8 @@ export async function POST(request: NextRequest) {
     // A user id from the browser is never trusted; reject a mismatched one.
     assertOwnership(user.id, typeof body.userId === 'string' ? body.userId : null);
 
-    const cfg = readServerEnv();
+    const runtimeEnv = serverEnvWithOidc(request);
+    const cfg = readServerEnv(runtimeEnv);
     const repoFullName = validateRepoFullName(body.repoFullName);
     const ref = validateRef(body.ref);
     const prompt = validatePrompt(body.prompt);
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
     const token = github.token;
 
     // --- runtime configuration (never fabricate a reply) ---------------------
-    const status = configStatus();
+    const status = configStatus(runtimeEnv);
     if (!status.openCodeConfigured) {
       throw new AppError(503, 'OPENCODE_NOT_CONFIGURED', status.setupMessage);
     }
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
       const archivePath = path.join(workspace.tmp, 'repo.tar.gz');
       await downloadRepositoryArchive(token, repoFullName, ref, archivePath, cfg.openCodeMaxRepoBytes);
       await extractRepositoryArchive(archivePath, workspace.repo);
-      return runOpenCodeAgent({ workspace, prompt, repoFullName, ref, model: selectedModel });
+      return runOpenCodeAgent({ workspace, prompt, repoFullName, ref, model: selectedModel, serverEnv: runtimeEnv });
     });
 
     if (result.ok) {

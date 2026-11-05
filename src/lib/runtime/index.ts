@@ -23,3 +23,5 @@ export type {
   RuntimeAdapter,
   RuntimeProbeResult,
 } from './types';
+
+export { hasVercelOidc, serverEnvWithOidc, vercelOidcToken, VERCEL_OIDC_HEADER } from './credentials';

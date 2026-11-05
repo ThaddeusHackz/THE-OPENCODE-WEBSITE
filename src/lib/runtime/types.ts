@@ -30,8 +30,13 @@ export type AgentRunRequest = {
   prompt: string;
   repoFullName: string;
   ref: string;
-  /** Validated official free model or the server-configured model. */
+  /** Validated normal free model or the server-configured model. */
   model?: string;
+  /**
+   * Request-scoped server env (includes Vercel's per-request OIDC token).
+   * Never mutates process.env, so concurrent Function invocations stay isolated.
+   */
+  serverEnv?: Record<string, string | undefined>;
 };
 
 export interface RuntimeAdapter {

@@ -11,6 +11,7 @@ import {
   withTempWorkspace,
   type TempWorkspace,
 } from '../workspace';
+import { serverEnvWithOidc } from './credentials';
 import type { AgentRunRequest, AgentRunResult, RuntimeAdapter, RuntimeProbeResult } from './types';
 
 const RUNTIME_ID = 'opencode-cli' as const;
@@ -284,7 +285,8 @@ export async function probeOpenCode(): Promise<RuntimeProbeResult> {
  * Repository contents are untrusted; the child gets a stripped environment.
  */
 export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentRunResult> {
-  const cfg = readServerEnv();
+  const runtimeEnv = request.serverEnv ?? serverEnvWithOidc();
+  const cfg = readServerEnv(runtimeEnv);
   const binary = resolveOpenCodeBinary();
   if (!binary) {
     throw new AppError(
@@ -299,7 +301,7 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
   } catch (error) {
     throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
   }
-  assertModelKeysConfigured(model);
+  assertModelKeysConfigured(model, runtimeEnv);
 
   await writeWorkspaceOpenCodeConfig(request.workspace.repo, model);
   const before = await snapshotFiles(request.workspace.repo);
@@ -317,14 +319,14 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
     throw new AppError(
       502,
       'OPENCODE_SPAWN_FAILED',
-      `Could not start the OpenCode runtime: ${redactSecrets(error instanceof Error ? error.message : String(error))}`,
+      `Could not start the OpenCode runtime: ${redactSecrets(error instanceof Error ? error.message : String(error), runtimeEnv)}`,
     );
   }
   const after = await snapshotFiles(request.workspace.repo);
   const { changes, patch } = diffSnapshots(before, after);
   const parsed = extractAssistantText(spawned.stdout);
-  const stdout = redactSecrets(spawned.stdout);
-  const stderr = redactSecrets(spawned.stderr);
+  const stdout = redactSecrets(spawned.stdout, runtimeEnv);
+  const stderr = redactSecrets(spawned.stderr, runtimeEnv);
 
   let error: string | null = null;
   if (spawned.timedOut) {
@@ -366,8 +368,12 @@ export type ModelSmokeResult = {
   stderr: string;
 };
 
-export async function runOpenCodeSmokeTest(requestedModel: string): Promise<ModelSmokeResult> {
-  const cfg = readServerEnv();
+export async function runOpenCodeSmokeTest(
+  requestedModel: string,
+  options: { serverEnv?: Record<string, string | undefined> } = {},
+): Promise<ModelSmokeResult> {
+  const runtimeEnv = options.serverEnv ?? serverEnvWithOidc();
+  const cfg = readServerEnv(runtimeEnv);
   const binary = resolveOpenCodeBinary();
   if (!binary) {
     throw new AppError(503, 'OPENCODE_RUNTIME_NOT_FOUND', 'The real OpenCode binary is not available in this function.');
@@ -378,7 +384,7 @@ export async function runOpenCodeSmokeTest(requestedModel: string): Promise<Mode
   } catch (error) {
     throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
   }
-  assertModelKeysConfigured(model);
+  assertModelKeysConfigured(model, runtimeEnv);
   return withTempWorkspace(async (workspace) => {
     await writeWorkspaceOpenCodeConfig(workspace.repo, model);
     await writeFile(path.join(workspace.repo, 'README.md'), '# free-model smoke test\n', 'utf8');
@@ -387,17 +393,17 @@ export async function runOpenCodeSmokeTest(requestedModel: string): Promise<Mode
     try {
       spawned = await spawnWithTimeout(binary, args, {
         cwd: workspace.repo,
-        env: buildChildEnv(workspace),
+        env: buildChildEnv(workspace, runtimeEnv),
         timeoutMs: Math.min(cfg.openCodeTimeoutMs, 90_000),
         maxOutputBytes: cfg.openCodeMaxOutputBytes,
         stdin: 'Reply with the single word OK.',
       });
     } catch (error) {
-      throw new AppError(502, 'OPENCODE_SPAWN_FAILED', `Could not start OpenCode: ${redactSecrets(String(error))}`);
+      throw new AppError(502, 'OPENCODE_SPAWN_FAILED', `Could not start OpenCode: ${redactSecrets(String(error), runtimeEnv)}`);
     }
     const parsed = extractAssistantText(spawned.stdout);
-    const stdout = redactSecrets(spawned.stdout);
-    const stderr = redactSecrets(spawned.stderr);
+    const stdout = redactSecrets(spawned.stdout, runtimeEnv);
+    const stderr = redactSecrets(spawned.stderr, runtimeEnv);
     let error: string | null = null;
     if (spawned.timedOut) error = 'AGENT_TIMEOUT: the model did not answer within the smoke-test limit.';
     else if (spawned.exitCode !== 0 || parsed.errors.length > 0)

@@ -4,6 +4,7 @@ import { AppError } from '@/lib/errors';
 import { jsonError, jsonOk } from '@/lib/http';
 import { validateModel } from '@/lib/models';
 import { runOpenCodeSmokeTest } from '@/lib/runtime';
+import { serverEnvWithOidc } from '@/lib/runtime/credentials';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,8 @@ export const maxDuration = 120;
  */
 async function handle(request: NextRequest) {
   try {
-    const status = configStatus();
+    const runtimeEnv = serverEnvWithOidc(request);
+    const status = configStatus(runtimeEnv);
     if (!status.modelTestsEnabled) {
       throw new AppError(403, 'MODEL_TESTS_DISABLED', 'Set ENABLE_MODEL_TESTS=1 to enable the free-model verification route.');
     }
@@ -34,7 +36,7 @@ async function handle(request: NextRequest) {
     } catch (error) {
       throw new AppError(400, 'INVALID_MODEL', error instanceof Error ? error.message : 'Invalid model.');
     }
-    const result = await runOpenCodeSmokeTest(model);
+    const result = await runOpenCodeSmokeTest(model, { serverEnv: runtimeEnv });
     return jsonOk(result);
   } catch (error) {
     return jsonError(error);
