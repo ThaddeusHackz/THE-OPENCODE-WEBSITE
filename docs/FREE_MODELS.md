@@ -90,3 +90,44 @@ is absent, and the app never silently switches to Zen or another model.
 - The `vercel` provider relies on Vercel's OIDC token; it will not work in a
   plain local `npm run dev` outside Vercel (config will show the missing token).
 - No silent fallback: if the chosen model fails, the real error is displayed.
+
+## Live verification (production, 2026-11-05)
+
+Deployment `dpl_2drJMTFR5qyJm7Q6XZT6eDY5UvYY` / commit `daa9cc3`. Real HTTP
+requests against `https://the-opencode-website-poc.vercel.app`:
+
+- `/api/config` → `openCodeConfigured: true`, `missing: []`,
+  `vercelOidcConfigured: true`, `disableZenFreeModels: true`.
+- `/api/models` → 214 models / 45 providers / 5 keyless, `oidcTokenPresent: true`.
+- `/api/runtime/poc` → real `opencode v2.2.5` binary present.
+- Four `vercel/*` keyless models → real `provider.auth` 403
+  `customer_verification_required` from the Vercel AI Gateway: the account
+  needs a card on file to unlock its free credits. The OIDC token was accepted
+  as authentication; this is not a missing-key error.
+- `vercel/poolside/laguna-s-2.1-free` → `provider.no-route` (live catalog drift;
+  it remains in the catalog but was demoted from "preferred", and the app shows
+  the real error rather than hiding it).
+- `amd/DeepSeek-V4.1-Flash` → honest `OPENCODE_NOT_CONFIGURED` naming
+  `AMD_API_KEY`. No reply was generated.
+- Any `opencode/*` Zen id → `INVALID_MODEL`, "OpenCode Zen models are disabled".
+
+### OIDC token delivery (important)
+
+`VERCEL_OIDC_TOKEN` exists as an env var only during **builds** and in local dev
+(`vercel env pull`). In a Function it arrives as the **`x-vercel-oidc-token`
+request header**. `src/lib/runtime/credentials.ts` reads it per request and
+exposes it to the child under both `VERCEL_OIDC_TOKEN` and
+`AI_GATEWAY_API_KEY`, without mutating `process.env` (Fluid compute can serve
+concurrent invocations with different tokens). Only presence is ever reported;
+the value is never returned, logged, or persisted.
+
+### What is needed for a successful answer
+
+1. **Keyless `vercel/*` models:** add a card on file to the Vercel account to
+   unlock AI Gateway free credits (Vercel's own requirement), then re-run
+   `/api/models/test?model=vercel/reflection/beam-free`.
+2. **Any other normal free model:** set that provider's free key as a sensitive
+   Vercel env var (the UI and `/api/models` show the exact name), then select it.
+
+Neither step involves putting a key value in the repo or in chat. No fake reply
+is generated while either is missing.

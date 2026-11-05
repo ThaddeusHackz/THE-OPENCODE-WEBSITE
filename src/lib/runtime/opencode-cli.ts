@@ -353,6 +353,20 @@ export async function runOpenCodeAgent(request: AgentRunRequest): Promise<AgentR
   };
 }
 
+/** Turn a real upstream failure into an actionable setup hint (never a reply). */
+export function smokeTestHint(stdout: string): string | null {
+  if (/customer_verification_required|credit card on file/i.test(stdout)) {
+    return 'Vercel AI Gateway needs a credit card on file to unlock its free credits. Add one in the Vercel dashboard, or choose a normal free model and set its provider key.';
+  }
+  if (/provider\.no-route|Model unavailable/i.test(stdout)) {
+    return 'This id is no longer routed by the live OpenCode catalog. Choose another normal free model or regenerate the catalog.';
+  }
+  if (/OPENCODE_NOT_CONFIGURED|Missing credential/i.test(stdout)) {
+    return 'Set the named provider credential as a sensitive server-side environment variable.';
+  }
+  return null;
+}
+
 /** Real, tiny model-backed run used to verify a normal free model works. */
 export type ModelSmokeResult = {
   ok: boolean;
@@ -364,6 +378,8 @@ export type ModelSmokeResult = {
   durationMs: number;
   timedOut: boolean;
   quota: { retryAfterMs: number; retryAfterHours: number } | null;
+  /** Actionable setup guidance derived from the real upstream error. */
+  hint: string | null;
   stdout: string;
   stderr: string;
 };
@@ -417,6 +433,7 @@ export async function runOpenCodeSmokeTest(
         }
       : null;
     if (quota && error) error = `OPENCODE_FREE_LIMIT: ${error} Retry in about ${quota.retryAfterHours} h.`;
+    const hint = error ? smokeTestHint(stdout) : null;
     return {
       ok: error === null,
       runtimeId: RUNTIME_ID,
@@ -427,6 +444,7 @@ export async function runOpenCodeSmokeTest(
       durationMs: spawned.durationMs,
       timedOut: spawned.timedOut,
       quota,
+      hint,
       stdout: stdout.slice(0, 2000),
       stderr: stderr.slice(0, 1000),
     };

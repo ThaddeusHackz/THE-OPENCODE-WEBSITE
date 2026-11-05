@@ -55,6 +55,7 @@ type ModelTestResult = {
   durationMs: number;
   timedOut: boolean;
   quota?: { retryAfterMs: number; retryAfterHours: number } | null;
+  hint?: string | null;
 };
 
 type Repo = {
@@ -314,6 +315,7 @@ export default function App() {
           durationMs: 0,
           timedOut: false,
           quota: null,
+          hint: null,
         },
         ...previous,
       ].slice(0, 47));
@@ -483,6 +485,7 @@ export default function App() {
                         <div className="who">{result.ok ? 'PASS' : 'FAIL'} · {result.model}</div>
                         <pre>{result.ok ? (result.text ?? '').slice(0, 160) : (result.error ?? 'unknown error')}</pre>
                         {result.quota ? <div className="who">Upstream free quota · retry in ~{result.quota.retryAfterHours} h</div> : null}
+                        {result.hint ? <div className="who">{result.hint}</div> : null}
                       </div>
                     ))}
                   </div>

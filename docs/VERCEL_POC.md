@@ -283,3 +283,86 @@ ids that were not in the bundled snapshot.
 **All 10 currently-live official free models have now been individually run through the real
 OpenCode CLI on Vercel. Every one returned the same upstream free-tier quota error. There is
 still no successful model-backed assistant answer, and no fake reply has been produced.**
+
+---
+
+# Fifth and sixth deployments — NORMAL free models (current end state)
+
+The four Zen deployments above are **historical**. All ten live `opencode/*` free
+models returned `provider.free-limit` HTTP 429 (~22 h cooldown), so Zen was
+removed from the product path entirely.
+
+| Deployment | Commit | Result |
+|---|---|---|
+| `dpl_65KA1xJZPJmsPfLocSbnpEY7YGth` | `ad961a7963b5156413899f801010776e31078ec5` | READY / PROMOTED, `timeToReady: 69992`, production alias assigned. Normal-model catalog shipped. |
+| `dpl_2drJMTFR5qyJm7Q6XZT6eDY5UvYY` | `daa9cc37b883583b75b4464702999a3aa16c8f91` | READY / PROMOTED, `timeToReady: 67834`, production alias assigned. Per-request OIDC header fix. |
+
+Vercel env `OPENCODE_MODEL` is now `vercel/reflection/beam-free` and
+`OPENCODE_DISABLE_FREE_MODELS=1` was added. OIDC Federation is enabled on the
+project (`oidcTokenConfig.enabled: true`).
+
+## Important platform finding
+
+`VERCEL_OIDC_TOKEN` is listed in the deployment's **build** env, but it is **not**
+in `process.env` inside a Function. Vercel delivers the token per invocation as
+the `x-vercel-oidc-token` **request header** ([system env vars doc][1],
+[OIDC reference][2]). The first normal-model deployment therefore reported
+`vercelOidcConfigured: false` / `missing: ["credential for
+vercel/reflection/beam-free: AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN"]`.
+`src/lib/runtime/credentials.ts` now reads that header per request and places it
+in an in-memory env record (never mutating `process.env`, never returning or
+logging the value). That record is threaded through `configStatus`,
+`assertModelKeysConfigured`, `buildChildEnv` and `redactSecrets`.
+
+[1]: https://vercel.com/docs/environment-variables/system-environment-variables
+[2]: https://vercel.com/docs/oidc/reference
+
+## Live results on `dpl_2drJMT...` (2026-11-05, real HTTP requests)
+
+`GET /api/config?v=oidc1` →
+`openCodeConfigured: true`, `missing: []`, `catalog: "normal"`,
+`model: "vercel/reflection/beam-free"`, `keylessOnVercel: true`,
+`vercelOidcConfigured: true`, `disableZenFreeModels: true`,
+`missingModelEnvKeys: []`. Setup message: "normal Vercel AI Gateway free model;
+keyless via the automatic OIDC token".
+
+`GET /api/models?v=oidc1` → `count: 214`, `providers: 45`,
+`keylessOnVercel: 5`, `catalog: "normal"`, `oidcTokenPresent: true`,
+`defaultModel` / `configuredModel` = `vercel/reflection/beam-free`. No credential
+values, only env var NAMES.
+
+`GET /api/runtime/poc?v=normal1` → real binary
+`/var/task/node_modules/@opencode/cli-linux-x64/bin/opencode`,
+`opencode v2.2.5`, `available: true`.
+
+Real `opencode --standalone run` model tests (each spawns the actual CLI in a
+fresh `/tmp` workspace, ~3–4 s each):
+
+| Model | Real outcome |
+|---|---|
+| `vercel/reflection/beam-free` (default) | `provider.auth` HTTP 403 `customer_verification_required`: "AI Gateway requires a valid credit card on file to service requests… to add a card and unlock your free credits." |
+| `vercel/nvidia/nemotron-3.5-lightning-free` | Same real 403 `customer_verification_required` |
+| `vercel/stealth/glyph-cluster` | Same real 403 `customer_verification_required` |
+| `vercel/reflection/beam` | Same real 403 `customer_verification_required` |
+| `vercel/poolside/laguna-s-2.1-free` | `provider.no-route` — "Model unavailable" (live OpenCode catalog no longer routes this dev-snapshot id; demoted from preferred) |
+| `amd/DeepSeek-V4.1-Flash` (keyed normal free model) | `OPENCODE_NOT_CONFIGURED`: "Missing credential for amd/DeepSeek-V4.1-Flash: AMD_API_KEY … No reply was generated." |
+| `opencode/deepseek-v4.1-flash-free` (Zen) | `INVALID_MODEL`: "OpenCode Zen models are disabled; choose a normal provider free model" |
+
+**Interpretation.** The keyless normal-model path is proven end-to-end:
+Function → real OpenCode CLI → `vercel-ai-gateway` provider → real HTTPS call to
+the Vercel AI Gateway, authenticated by the automatic OIDC token. The gateway
+accepted the request far enough to return its own account-verification 403. That
+is a **Vercel account requirement** (a card on file to unlock free AI Gateway
+credits), not a missing API key and not a code bug. Four of five keyless ids
+reach it; one id has drifted out of the live catalog.
+
+**There is still no successful model-backed assistant answer, and no reply has
+been fabricated or silently switched.** To get one, either add a card on file to
+the Vercel account (unlocking AI Gateway free credits for the `vercel/*` models),
+or set any one free provider credential (e.g. `OPENROUTER_API_KEY`,
+`GROQ_API_KEY`, `NVIDIA_API_KEY`, `AMD_API_KEY`, `HF_TOKEN`) as a sensitive
+Vercel env var and select one of the other 209 normal free models.
+
+No provider key values, OIDC token, GitHub PAT or Supabase service-role key are
+in the browser, logs, workspace or repository. `npm run check` (63 tests),
+`npm run build`, and a credential-pattern scan all pass.

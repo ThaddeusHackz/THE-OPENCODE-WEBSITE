@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { configStatus, readServerEnv } from '../src/lib/env';
-import { assertModelKeysConfigured, buildChildEnv, extractAssistantText, redactSecrets, resolveOpenCodeBinary } from '../src/lib/runtime/opencode-cli';
+import { assertModelKeysConfigured, buildChildEnv, extractAssistantText, redactSecrets, resolveOpenCodeBinary, smokeTestHint } from '../src/lib/runtime/opencode-cli';
 import { DEFAULT_FREE_MODEL } from '../src/lib/models';
 import { diffSnapshots, unifiedDiff, type FileSnapshot } from '../src/lib/workspace';
 
@@ -56,6 +56,13 @@ describe('runtime adapter boundary', () => {
     expect(() =>
       assertModelKeysConfigured(DEFAULT_FREE_MODEL, { VERCEL_OIDC_TOKEN: 'oidc' }),
     ).not.toThrow();
+  });
+
+  it('turns real upstream errors into actionable hints, not fake replies', () => {
+    expect(smokeTestHint('customer_verification_required')).toContain('credit card');
+    expect(smokeTestHint('provider.no-route Model unavailable')).toContain('no longer routed');
+    expect(smokeTestHint('Missing credential for amd/DeepSeek-V4.1-Flash: AMD_API_KEY')).toContain('credential');
+    expect(smokeTestHint('{"type":"text","part":{"text":"OK"}}')).toBeNull();
   });
 
   it('parses real OpenCode JSON events and errors', () => {

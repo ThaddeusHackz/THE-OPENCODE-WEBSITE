@@ -14,6 +14,7 @@ export {
   buildChildEnv,
   extractAssistantText,
   redactSecrets,
+  smokeTestHint,
   writeWorkspaceOpenCodeConfig,
 } from './opencode-cli';
 export type { ModelSmokeResult } from './opencode-cli';

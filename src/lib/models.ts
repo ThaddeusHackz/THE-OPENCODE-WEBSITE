@@ -43,7 +43,6 @@ export const DEFAULT_FREE_MODEL = 'vercel/reflection/beam-free';
 
 export const PREFERRED_FREE_IDS = [
   "vercel/reflection/beam-free",
-  "vercel/poolside/laguna-s-2.1-free",
   "vercel/nvidia/nemotron-3.5-lightning-free",
   "vercel/stealth/glyph-cluster",
   "amd/DeepSeek-V4.1-Flash",
@@ -56,7 +55,7 @@ export const PREFERRED_FREE_IDS = [
 
 export const FREE_MODELS: FreeModel[] = [
   { provider: "vercel", id: "reflection/beam-free", fullId: "vercel/reflection/beam-free", name: "Beam 1.0 (Free)", context: 1048576, output: 131072, cost: 0, envKeys: ["AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN"], keylessOnVercel: true, preferred: true },
-  { provider: "vercel", id: "poolside/laguna-s-2.1-free", fullId: "vercel/poolside/laguna-s-2.1-free", name: "Laguna S 2.1 Free", context: 256000, output: 32768, cost: 0, envKeys: ["AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN"], keylessOnVercel: true, preferred: true },
+  { provider: "vercel", id: "poolside/laguna-s-2.1-free", fullId: "vercel/poolside/laguna-s-2.1-free", name: "Laguna S 2.1 Free", context: 256000, output: 32768, cost: 0, envKeys: ["AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN"], keylessOnVercel: true, preferred: false },
   { provider: "vercel", id: "nvidia/nemotron-3.5-lightning-free", fullId: "vercel/nvidia/nemotron-3.5-lightning-free", name: "Nemotron 3.5 Lightning Free", context: 1000000, output: 65000, cost: 0, envKeys: ["AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN"], keylessOnVercel: true, preferred: true },
   { provider: "vercel", id: "stealth/glyph-cluster", fullId: "vercel/stealth/glyph-cluster", name: "Glyph Cluster", context: 256000, output: 256000, cost: 0, envKeys: ["AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN"], keylessOnVercel: true, preferred: true },
   { provider: "amd", id: "DeepSeek-V4.1-Flash", fullId: "amd/DeepSeek-V4.1-Flash", name: "DeepSeek V4.1 Flash", context: 1048576, output: 384000, cost: 0, envKeys: ["AMD_API_KEY"], keylessOnVercel: false, preferred: true },

@@ -80,5 +80,13 @@ model's required env var NAME and whether it is keyless on Vercel.
 
 PR: [#1](https://github.com/ThaddeusHackz/THE-OPENCODE-WEBSITE/pull/1) on
 branch `arena/3a7379f3-the-opencode-website`.
+
+Deployed and verified live: `/api/config` reports `catalog:"normal"`,
+`vercelOidcConfigured:true`, `missing:[]`; `/api/models` returns 214 normal free
+models; the real CLI v2.2.5 runs on the server. Real model tests reach the
+Vercel AI Gateway but return its `customer_verification_required` 403 — a card
+on file is needed to unlock free credits (or set one free provider key). See
+[docs/CHECKLIST.md](docs/CHECKLIST.md) and
+[docs/VERCEL_POC.md](docs/VERCEL_POC.md). No assistant reply has been fabricated.
 Not affiliated with or endorsed by OpenCode / Anomaly. Original upstream project:
 MIT. Copyright (c) 2025-present Anomaly.
