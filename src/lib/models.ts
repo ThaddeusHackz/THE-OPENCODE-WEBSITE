@@ -448,16 +448,32 @@ export const FREE_MODELS: FreeModel[] = [
 
 export const FREE_MODEL_IDS = new Set(FREE_MODELS.map((model) => model.fullId));
 
+/** From packages/core/src/model.ts (signed-out free tier). */
+export const PREFERRED_FREE_IDS = [
+  'big-pickle',
+  'deepseek-v4.1-flash-free',
+  'glm-5.3-flash-free',
+  'muse-spark-1.3-contributor-free',
+] as const;
+
 export function isFreeOpenCodeModel(model: string): boolean {
   return FREE_MODEL_IDS.has(model);
 }
 
-/** Reject arbitrary model strings so a browser value cannot steer the CLI. */
+/**
+ * Reject arbitrary model strings so a browser value cannot steer the CLI to a
+ * different provider. Official free `opencode/*` ids are accepted even when
+ * they are newer than the bundled snapshot — the live official catalog is the
+ * source of truth, and a retired id returns a real `provider.no-route` error
+ * from the CLI rather than a silent switch to another model.
+ */
 export function validateModel(model: unknown, configured: string): string {
   if (typeof model !== 'string' || model.length === 0) return configured;
   if (model.length > 120) throw new Error('model id is too long');
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,119}$/.test(model)) throw new Error('model id contains unsafe characters');
   if (isFreeOpenCodeModel(model)) return model;
-  if (model === configured && /^[A-Za-z0-9][A-Za-z0-9._/-]{0,119}$/.test(model)) return model;
+  if (model.startsWith('opencode/') && model.length > 'opencode/'.length) return model;
+  if (model === configured) return model;
   throw new Error('model is not an official free OpenCode model or the configured model');
 }
 

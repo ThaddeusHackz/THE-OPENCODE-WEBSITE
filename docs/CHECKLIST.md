@@ -1,77 +1,98 @@
 # Plain-language final checklist
 
-## What works (code + tests in this repository)
+## What works (code + tests + real infrastructure)
 
 - [x] The original `README.md` heading was preserved; no existing file was deleted or overwritten destructively.
+- [x] PR **#1** was created before the new work: <https://github.com/ThaddeusHackz/THE-OPENCODE-WEBSITE/pull/1>.
 - [x] REA setup was planned, approved, executed and verified. MCP server `rea` is registered
-      (V2 shape) and a direct stdio handshake listed 229 tools. Node version mismatches,
-      the `mcp list` false negative, the port 49374 conflict and the pwntools provider error
-      are all documented in `docs/REA.md`.
-- [x] Official OpenCode repository/docs were inspected read-only; license/attribution noted;
-      no core source copied or modified (`docs/REVERSE_ENGINEERING.md`).
-- [x] Vercel + OpenCode constraints were checked against current official docs
+      (V2 shape) and a direct stdio handshake listed 229 tools (`docs/REA.md`).
+- [x] Official OpenCode repository/docs were inspected read-only; license/attribution noted
+      (`docs/REVERSE_ENGINEERING.md`).
+- [x] Vercel + OpenCode constraints checked against official docs
       (`docs/ARCHITECTURE.md`).
 - [x] Real backend routes: `/api/me`, `/api/config`, `/api/repos`, `/api/sessions`,
       `/api/sessions/[id]/messages`, `/api/agent/run`, `/api/runtime/probe`,
       `/api/sessions/[id]/publish`, `/api/runtime/poc`, `/api/auth/signin`,
-      `/api/auth/signout`, `/auth/callback`.
-- [x] Supabase GitHub sign-in, cookie-based server-verified sessions, user-owned
-      sessions/messages, migration with RLS policies, and server-side ownership checks.
-- [x] Least-privilege GitHub App (Contents: read, Metadata: read) for repo listing,
-      collaborator verification and archive download. No token pasted into source.
+      `/api/auth/signout`, `/auth/callback`, **`/api/models`**, **`/api/models/test`**.
+- [x] Supabase Auth (cookie-based, server-verified), user-owned sessions/messages, RLS.
+      The remote migration `opencode_website_sessions` was applied and **verified by SQL**:
+      `agent_sessions` + `agent_messages`, 4 policies each (`docs/SUPABASE.md`).
+- [x] Least-privilege GitHub App path **plus a server-side fine-grained PAT fallback**, with
+      an installation/user allowlist and a collaborator check before any archive download.
+      The token is a Vercel **sensitive** env var; no secret in the repo.
+- [x] **All 47 official free OpenCode Zen models** (including DeepSeek V4.1 Flash Free)
+      compiled into a vetted catalog; `/api/models` additionally reads the **live** official
+      catalog so retired ids disappear. UI has a model selector and sends the chosen model.
+      `docs/FREE_MODELS.md`.
 - [x] Fresh `/tmp` workspace per request, safe tar extraction, bounded sizes, stripped child
       environment, strict OpenCode permissions, `finally` cleanup.
-- [x] Responsive UI with sign-in, repo selection, conversation, saved sessions,
-      loading/error/empty states, ephemeral-workspace notice, diff review, runtime probe.
+- [x] Responsive UI with sign-in, repo + model selection, conversation, saved sessions,
+      loading/error/empty states, diff review, runtime probe, model test results.
 - [x] No fake successful agent replies; setup errors and real runtime errors are shown.
-- [x] No automatic write-back. A diff is shown and `/publish` requires an explicit
-      confirmation phrase, then deliberately returns `501` (no branch/commit/PR created).
-- [x] `.env.example` with variable names/descriptions only; no secret values committed.
-- [x] **Real Vercel deployment + minimal runtime PoC.** Next.js 16.4.5 / Node 22.x / Hobby
-      / Fluid+Active CPU / `VERCEL_SUPPORT_LARGE_FUNCTIONS=1`. The actual OpenCode v2.2.5
-      binary was spawned inside a deployed Function and returned `opencode v2.2.5` from
-      `/api/runtime/poc`. Build logs, created resources and exact JSON are in
-      `docs/VERCEL_POC.md`.
-- [x] Tests for validation, auth, ownership/request validation and the runtime boundary;
-      lint, typecheck and tests run via `npm run check`.
+      No silent model switching.
+- [x] No automatic write-back. `/publish` requires an explicit confirmation phrase, then
+      deliberately returns `501`.
+- [x] `.env.example` updated with `GITHUB_TOKEN`, `OPENCODE_MODEL`, `ENABLE_MODEL_TESTS`;
+      no secret values committed. Post-edit secret grep was negative.
+- [x] **Real Vercel deployments.** `dpl_EkZXxPf7WvE9taASL5Z2xYiXT8Vi` proved the binary;
+      `dpl_4egrjDETAEJq5Uv5cjKg6Ap4iCqX` (commit `c80b210` then `…`) deployed the full
+      free-model/PAT/Supabase refresh. Both `READY`/`PROMOTED`. `docs/VERCEL_POC.md`.
+- [x] `GET /api/config` on the live site → `supabaseConfigured: true`, `githubMode: "pat"`,
+      `openCodeConfigured: true`, `freeModel: true`, `missing: []`.
+- [x] `GET /api/runtime/poc` → real `opencode v2.2.5` binary at
+      `/var/task/node_modules/@opencode/cli-linux-x64/bin/opencode`.
+- [x] **Full `opencode run` executed on Vercel with the real free DeepSeek V4.1 Flash model.**
+      The CLI spawned, reached OpenCode Zen, and returned a real
+      `provider.free-limit` / HTTP 429 (`retryAfterMs ≈ 80,000,000`). This is a real upstream
+      answer, not a mock, and it confirms the whole runtime chain works.
+- [x] `npm run check` (lint + `tsc --noEmit` + 55 tests) and `npm run build` pass after all
+      edits.
 
-## What is scaffold / not proven
+## What is scaffold / not yet proven
 
-- [ ] A **full model-backed `opencode run` has NOT been completed on Vercel**: no
-      `OPENCODE_MODEL` or provider key is configured on the deployment, so `/api/agent/run`
-      returns `OPENCODE_NOT_CONFIGURED` rather than a fake reply. Locally a real `run`
-      emitted NDJSON `step_start` events then hit the hard `AGENT_TIMEOUT`.
-- [ ] Supabase project, GitHub App, OAuth app, encrypted model/provider env vars and the
-      migration have **not** been provisioned by me — they need your account
-      (setup steps in `docs/SETUP.md`).
-- [ ] A real model-backed agent response was not obtained locally: without provider keys the
-      CLI returned `provider.no-route` / `Model unavailable`; with a dummy key it emitted real
-      NDJSON events then timed out (documented, not hidden).
+- [ ] **A successful model-backed assistant answer has NOT been obtained.** OpenCode's free
+      tier returned HTTP 429 "Free usage limit reached" with a retry of about 22 hours. This
+      is an external quota, not a code defect; we did not bypass it and did not fake a reply.
+- [ ] **"All free models work perfectly" is not achievable from inside this repo.** Real
+      per-model runs showed two upstream failure classes: `provider.free-limit` (429) for
+      routable free models and `provider.no-route` ("Model unavailable") for free ids that
+      have been retired from the live catalog. The live catalog refresh removes retired ids.
+- [ ] **Supabase GitHub sign-in is still disabled** (`external_github_enabled: false`). The
+      connector cannot set an OAuth client id/secret; enable it once in the Supabase dashboard
+      with a GitHub OAuth App (`docs/SUPABASE.md`). Until then `/api/me` returns `user: null`
+      and the sign-in button cannot start OAuth.
 - [ ] Write-back (branch/commit/PR) is intentionally not implemented.
-- [ ] Full-source REA analysis of the 248 MB OpenCode monorepo was not run; only the
-      published CLI wrapper was statically analysed. Binary-layout REA needs a pwntools
-      Python provider that was not installed.
+- [ ] Full-source REA analysis of the 248 MB OpenCode monorepo was not run; binary-layout REA
+      needs a pwntools Python provider that was not installed.
+- [ ] `VercelSandboxAdapter` (long-running microVM) not implemented; a single Hobby function
+      is capped at 300 s and `maxDuration=300` is set on `/api/agent/run`.
+- [ ] Multi-minute function duration not tested end-to-end.
 
 ## Errors encountered and how they were addressed
 
 | Error | Handling |
 |---|---|
+| User's GitHub fine-grained PAT was pasted in chat twice | Used it only transiently + as a Vercel sensitive env var; never written to repo/output. **Rotate/revoke it** — it is compromised |
 | REA 6.8.0 rejects system Node 22.22.3 | Approved ephemeral Node 22.23.4 in `/tmp`; system Node unchanged |
-| `mcp list` empty with valid config | Traced to official source/issues; verified with `debug config` + real MCP stdio handshake instead |
+| `mcp list` empty with valid config | Traced to official source/issues; verified with `debug config` + real MCP stdio handshake |
 | Port 49374 already in use | `--standalone` in every runtime invocation |
-| `provider.no-route` on `opencode run` | Honest setup error; no mock/fallback model |
+| `provider.no-route` / `Model unavailable` | Real CLI error shown; live official catalog refresh added so retired ids are not offered |
+| `provider.free-limit` / HTTP 429 | Real upstream error shown with retry hours; no fallback model, no fake answer |
 | `provider_unavailable` for REA binary layout | Not installed silently; used `readelf`; documented |
-| `file` command missing | Used `readelf -l/-d/-V` and `ldd` |
-| Vercel `create_deployment` with inline `files` → `400 files[0].data should be string` | Connector validation limitation; recovered by pushing the branch and using `git_source` |
-| Vercel `list_deployment_files` → `404 File tree not found` | Not retried; binary presence proven by actually spawning it |
-| Snap requires root/snapd | Explained it is Debian-machine-only; not run, not claimed installed |
+| Vercel inline `files` deployment → `400 files[0].data should be string` | Recovered by pushing the branch and using `git_source` |
+| Supabase `create_migration` returned `version: null` | Verified with SQL instead of assuming: tables + 8 policies present |
+| `vercel__list_deployment_files` → `404 File tree not found` | Not retried; binary presence proven by actually spawning it |
 
 ## Limitations and next steps
 
-1. Provision Supabase + GitHub App + encrypted env vars per `docs/SETUP.md`.
-2. Set `OPENCODE_MODEL` and one provider key on the Vercel project (binary bundling is already
-   proven). Confirm `/api/runtime/poc` still returns `available: true`.
-3. Send a small request and confirm a real assistant message (not a system error) is saved.
+1. **Rotate/revoke the PAT** that was pasted in chat, then replace it with a fresh Vercel
+   sensitive env var (or move to the GitHub App path).
+2. In the Supabase dashboard, enable the GitHub provider with a GitHub OAuth App client id and
+   secret; confirm the redirect allowlist already contains the Vercel domain.
+3. To get a real assistant answer, either wait for the free quota to reset (~22 h from
+   2026-11-05), subscribe to OpenCode Go, or set one provider key + a non-free
+   `OPENCODE_MODEL`. Then use the UI model selector and re-run `/api/models/test` for each
+   free model; every result will be a real one.
 4. For runs longer than a single function invocation, implement the `VercelSandboxAdapter`
    (same interface, no UI/DB changes).
 5. Only after explicit user confirmation, implement write-back behind the existing

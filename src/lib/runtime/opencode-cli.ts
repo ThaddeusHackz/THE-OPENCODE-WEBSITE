@@ -340,6 +340,7 @@ export type ModelSmokeResult = {
   exitCode: number | null;
   durationMs: number;
   timedOut: boolean;
+  quota: { retryAfterMs: number; retryAfterHours: number } | null;
   stdout: string;
   stderr: string;
 };
@@ -383,6 +384,14 @@ export async function runOpenCodeSmokeTest(requestedModel: string): Promise<Mode
     else if (spawned.exitCode !== 0 || parsed.errors.length > 0)
       error = parsed.errors[0] ?? stderr.slice(0, 500) ?? `OpenCode exited with code ${spawned.exitCode}`;
     else if (!parsed.text) error = 'OPENCODE_NO_OUTPUT: the real runtime produced no assistant text.';
+    const quotaMatch = stdout.match(/"retryAfterMs"\s*:\s*(\d+)/);
+    const quota = quotaMatch
+      ? {
+          retryAfterMs: Number(quotaMatch[1]),
+          retryAfterHours: Math.round((Number(quotaMatch[1]) / 3_600_000) * 10) / 10,
+        }
+      : null;
+    if (quota && error) error = `OPENCODE_FREE_LIMIT: ${error} Retry in about ${quota.retryAfterHours} h.`;
     return {
       ok: error === null,
       runtimeId: RUNTIME_ID,
@@ -392,6 +401,7 @@ export async function runOpenCodeSmokeTest(requestedModel: string): Promise<Mode
       exitCode: spawned.exitCode,
       durationMs: spawned.durationMs,
       timedOut: spawned.timedOut,
+      quota,
       stdout: stdout.slice(0, 2000),
       stderr: stderr.slice(0, 1000),
     };

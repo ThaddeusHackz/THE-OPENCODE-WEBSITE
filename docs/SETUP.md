@@ -20,7 +20,13 @@ a model key in `NEXT_PUBLIC_*`, localStorage, or logs.
    - You do **not** need to persist GitHub `provider_token`s; this app never reads them.
 3. **SQL Editor**: run `supabase/migrations/20261105000000_init.sql` (or `supabase db push`).
    It creates `agent_sessions` / `agent_messages`, enables RLS, and adds policies scoped to
-   `auth.uid() = user_id`. The server also enforces ownership independently.
+   `auth.uid() = user_id`. The server also enforces ownership independently. On the PoC project
+   this migration was already applied through the Supabase connector and verified by SQL
+   (`docs/SUPABASE.md`).
+
+   > **Connector limitation:** the Supabase connector cannot enable the GitHub provider or set
+   > an OAuth client id/secret. Do step 2 manually in the dashboard; it is the only remaining
+   > auth prerequisite.
 
 ## 2. GitHub App (least privilege)
 
@@ -42,6 +48,14 @@ Inventory of repos is capped at 30 collaborator checks per request.
 
 > Alternative: a GitHub OAuth app with `repo` scope would also work but grants write access to
 > private repos; that is why this prototype uses the App.
+>
+> **PAT fallback (used on the PoC):** set `GITHUB_TOKEN` to a fine-grained PAT as a Vercel
+> *sensitive* environment variable. `resolveGitHubContext()` then calls `GET /user` for the
+> owner login and `GET /user/repos` for the allowlist, and
+> `assertRepoAuthorized()` additionally verifies the signed-in Supabase user's GitHub login is
+> a collaborator before any archive download. The App takes precedence when both are set.
+> Never expose this token to the browser, logs, localStorage or commits; rotate it if it was
+> ever pasted into chat.
 
 ## 3. OpenCode runtime (server-side only)
 
@@ -56,9 +70,19 @@ For this website:
   platform binary is installed on Vercel's Linux x64 builders. `next.config.ts` includes it in
   `outputFileTracingIncludes` for the two server functions.
 - Optionally set `OPENCODE_BINARY_PATH` to an absolute path of an already-provisioned binary.
-- Set `OPENCODE_MODEL` (e.g. `anthropic/claude-sonnet-4-5`) and **at least one**
-  model-provider key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …). These are passed to the child
+- `OPENCODE_MODEL` defaults to the official free
+  `opencode/deepseek-v4.1-flash-free`, which needs **no** provider key. `GET /api/models`
+  returns every zero-cost model from the live official catalog. The UI lets the user choose
+  one; `validateModel()` rejects arbitrary model strings and there is no silent fallback.
+- For a **non-free** model (`anthropic/claude-sonnet-4-5`, etc.) set **at least one**
+  model-provider key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …). Keys are passed to the child
   process only, never to the browser, and are redacted from captured output.
+- Set `ENABLE_MODEL_TESTS=1` to enable `GET/POST /api/models/test?model=opencode/<id>`, which
+  spawns the real CLI with a tiny prompt and returns the real answer or real upstream error.
+  Disable it when not needed so the free quota is not consumed by anonymous traffic.
+- **Free-tier caveat:** OpenCode's free models are promotional and rate-limited. The real PoC
+  run returned `provider.free-limit` / HTTP 429 with `retryAfterMs ≈ 80,000,000`. That is an
+  upstream quota, not a code bug; see `docs/FREE_MODELS.md` and `docs/VERCEL_POC.md`.
 - Set `OPENCODE_TIMEOUT_MS` below your function's `maxDuration`. Defaults: 240 000 ms,
   `maxDuration = 300` (Hobby). Pro/Enterprise can raise `maxDuration` to 800.
 - `OPENCODE_MAX_REPO_BYTES` (default 50 MB) and `OPENCODE_MAX_OUTPUT_BYTES` (default 200 KB)

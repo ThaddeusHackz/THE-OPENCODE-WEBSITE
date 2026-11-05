@@ -98,3 +98,114 @@ notice. No fake agent reply is produced.
 Set `OPENCODE_MODEL` and one encrypted provider key on the project, then call the authenticated
 `/api/runtime/probe` and send a conversation request. No source change is needed for the binary
 spawn. For longer runs, add the `VercelSandboxAdapter` described in `docs/ARCHITECTURE.md`.
+
+---
+
+# Second deployment — free models, PAT fallback, Supabase, real model-backed run
+
+Deployment `dpl_4egrjDETAEJq5Uv5cjKg6Ap4iCqX`, git source
+`arena/3a7379f3-the-opencode-website` @ `c80b210b23ccfd2bcc821e69ae2083886b0910e1`,
+Node 22.x / Hobby / iad1 / Fluid + Active CPU / `functionTimeout: 300` / 10 Node functions.
+Final state `READY` → `PROMOTED`, `timeToReady: 65535`. Alias
+`the-opencode-website-poc.vercel.app` assigned. The build env list confirms
+`VERCEL_SUPPORT_LARGE_FUNCTIONS`, `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ENABLE_MODEL_TESTS`, `OPENCODE_MODEL`, `GITHUB_TOKEN`
+(all present; values not exposed here).
+
+## Live configuration (after env vars were added)
+
+`GET https://the-opencode-website-poc.vercel.app/api/config`
+
+```json
+{
+  "supabaseConfigured": true,
+  "githubAppConfigured": false,
+  "githubPatConfigured": true,
+  "githubMode": "pat",
+  "openCodeConfigured": true,
+  "binaryPathProvided": false,
+  "model": "opencode/deepseek-v4.1-flash-free",
+  "freeModel": true,
+  "modelTestsEnabled": true,
+  "missing": [],
+  "setupMessage": "Configuration present. Using opencode/deepseek-v4.1-flash-free (official free OpenCode Zen model, no API key needed). The real OpenCode runtime is attempted on the server only."
+}
+```
+
+`GET /api/runtime/poc` still returns
+
+```json
+{"available":true,"runtimeId":"opencode-cli","binaryPath":"/var/task/node_modules/@opencode/cli-linux-x64/bin/opencode","versionOutput":"opencode v2.2.5","error":null,"ephemeralWorkspace":true}
+```
+
+`GET /api/models` returned 47 zero-cost official models (preferred first:
+`big-pickle`, `deepseek-v4.1-flash-free`, `glm-5.3-flash-free`,
+`muse-spark-1.3-contributor-free`) from the official catalog. A later commit changed this
+route to read the **live** `https://opencode.ai/zen/v1/models` catalog with a snapshot
+fallback, because some bundled ids are retired.
+
+## Real model-backed run on Vercel
+
+`GET /api/models/test?model=opencode%2Fdeepseek-v4.1-flash-free` executes a fresh
+`opencode --standalone run --format json --auto --model opencode/deepseek-v4.1-flash-free`
+in a temp `/tmp` workspace with the prompt "Reply with the single word OK." Exact real result:
+
+```json
+{
+  "ok": false,
+  "runtimeId": "opencode-cli",
+  "model": "opencode/deepseek-v4.1-flash-free",
+  "text": null,
+  "error": "Free usage limit reached. Connect a provider or subscribe to OpenCode Go to keep going, or switch models.",
+  "exitCode": 1,
+  "durationMs": 6038,
+  "timedOut": false,
+  "stdout": "{\"type\":\"error\",...\"error\":{\"type\":\"provider.free-limit\",\"message\":\"Free usage limit reached...\",\"status\":429,...},\"retryAfterMs\":80035000}"
+}
+```
+
+Native CLI stdout contained the genuine upstream NDJSON error:
+
+```json
+{"type":"error","error":{"type":"provider.free-limit","message":"Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go"},"status":429,"retryAfterMs":80035000}
+```
+
+`retryAfterMs: 80035000` ≈ **22.2 hours**. No assistant text, no fabricated reply, no silent
+model switch.
+
+### Other free models actually tested on the same deployment
+
+| Model | Real result |
+|---|---|
+| `opencode/big-pickle` | `provider.free-limit` HTTP 429, `retryAfterMs: 78134000`, 19.5 s |
+| `opencode/glm-5.3-flash-free` | `provider.free-limit` HTTP 429, `retryAfterMs: 78132000`, 19.2 s |
+| `opencode/beam-free` | `provider.free-limit` HTTP 429, `retryAfterMs: 78014000`, 20.6 s |
+| `opencode/deepseek-v4.1-flash-free` | `provider.free-limit` HTTP 429, `retryAfterMs: 80035000`, 6.0 s |
+| `opencode/mimo-v2.5-free` | `provider.no-route` — `Model unavailable: opencode/mimo-v2.5-free` |
+| `opencode/nemotron-3-ultra-free` | `provider.no-route` — `Model unavailable: opencode/nemotron-3-ultra-free` |
+| `opencode/north-mini-code-free` | `provider.no-route` — `Model unavailable: opencode/north-mini-code-free` |
+| `opencode/grok-code` | `provider.no-route` — `Model unavailable: opencode/grok-code` |
+
+A few requests failed at the HTTP-fetch layer under concurrency and were not counted as model
+results. No model returned `ok: true`.
+
+## What this second deployment proves
+
+1. The whole runtime chain works on Vercel: Next.js Route Handler → `child_process.spawn` →
+   real 241 MB OpenCode binary → `--standalone run` → workspace `opencode.jsonc` → network
+   request to OpenCode Zen → NDJSON parsed back into an HTTP response.
+2. Configuration is complete: Supabase public env, GitHub PAT (sensitive), free model, and
+   model-test gate are all live, with `missing: []`.
+3. Free `opencode/*` models genuinely require **no provider key** — the CLI reached the model
+   gateway and got a quota error, not "no credentials".
+4. The blocker is now **external**: OpenCode's promotional free tier is exhausted for this
+   deployment, and some bundled free ids have been retired. Neither can be fixed in this repo.
+
+## What remains
+
+- Wait for the free quota reset (~22 h), subscribe to OpenCode Go, or set a provider key with
+  a non-free `OPENCODE_MODEL`; then repeat `/api/models/test` to obtain a real assistant answer.
+- Enable the Supabase GitHub OAuth provider in the dashboard (connector cannot set the OAuth
+  client id/secret). See `docs/SUPABASE.md`.
+- Rotate/revoke the fine-grained PAT that was pasted in chat.
+- Optional: `VercelSandboxAdapter` for multi-minute runs; write-back remains deliberately off.

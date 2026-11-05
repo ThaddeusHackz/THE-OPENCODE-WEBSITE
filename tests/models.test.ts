@@ -70,7 +70,12 @@ describe('model validation', () => {
 
   it('rejects arbitrary or oversized browser-supplied models', () => {
     expect(() => validateModel('evil/model --help', DEFAULT_FREE_MODEL)).toThrow();
+    expect(() => validateModel('anthropic/claude-sonnet-4-5', DEFAULT_FREE_MODEL)).toThrow();
     expect(() => validateModel('x'.repeat(200), DEFAULT_FREE_MODEL)).toThrow();
-    expect(() => validateModel('opencode/not-a-real-model', DEFAULT_FREE_MODEL)).toThrow();
+  });
+
+  it('accepts newly added official free ids so a live catalog refresh works', () => {
+    expect(validateModel('opencode/brand-new-free', DEFAULT_FREE_MODEL)).toBe('opencode/brand-new-free');
+    expect(() => validateModel('opencode/bad id', DEFAULT_FREE_MODEL)).toThrow();
   });
 });

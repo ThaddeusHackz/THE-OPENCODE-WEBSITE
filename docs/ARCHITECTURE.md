@@ -87,10 +87,13 @@ interface RuntimeAdapter {
 }
 ```
 
-There is **no mock adapter, no fallback coding model, and no simulated reply**. When
-`OPENCODE_MODEL`, a provider key, or the binary is missing, the API returns
-`OPENCODE_NOT_CONFIGURED` / `OPENCODE_RUNTIME_NOT_FOUND` with a clear setup message and
-records a `system` message. A `VercelSandboxAdapter` could implement the same interface in
+There is **no mock adapter, no fallback coding model, and no simulated reply**. Free
+`opencode/*` models need no provider key; any other model does. When the binary is missing the
+API returns `OPENCODE_RUNTIME_NOT_FOUND`; when a non-free model has no key it returns
+`OPENCODE_NOT_CONFIGURED`. A browser-supplied `model` is validated against the official free
+catalog / the configured model before it reaches the CLI, so there is no silent switch. Real
+upstream errors (`provider.free-limit`, `provider.no-route`, `AGENT_TIMEOUT`) are surfaced and
+recorded as `system` messages. A `VercelSandboxAdapter` could implement the same interface in
 the future without changing any route or UI code.
 
 ## 4. Runtime blockers: resolved vs remaining
@@ -106,23 +109,40 @@ the future without changing any route or UI code.
 | `/tmp` is not writable / isolated workspace impossible | Resolved — `withTempWorkspace` created and removed a fresh `/tmp` workspace |
 | Shared service port 49374 conflict | Avoided by `--standalone` (used by the adapter) |
 
-**Remaining (not proven / still required):**
+**Resolved in the second deployment** (`dpl_4egrjDETAEJq5Uv5cjKg6Ap4iCqX`,
+commit `c80b210` and later):
 
-1. **Model credentials (primary remaining blocker).** The deployed project has no
-   `OPENCODE_MODEL` and no provider key, so `configStatus()` returns
-   `openCodeConfigured: false` and `/api/agent/run` returns `OPENCODE_NOT_CONFIGURED`
-   instead of a fabricated reply. Locally, a `run` with no valid key returned
-   `provider.no-route`; a run with a dummy key emitted real NDJSON `step_start` events and
-   then hit the hard `AGENT_TIMEOUT`. Keys must be set as encrypted Vercel env vars.
+| Former concern | Result |
+|---|---|
+| No model configured | `OPENCODE_MODEL=opencode/deepseek-v4.1-flash-free`; `configStatus()` returns `openCodeConfigured: true`, `freeModel: true`, `missing: []` from the live site |
+| No GitHub access | Server-side fine-grained PAT fallback added (App still preferred); live `githubMode: "pat"` |
+| No Supabase | Publishable key + project URL set; migration applied and verified; redirect allowlist extended |
+| Free model catalog stale | `/api/models` now reads the **live** official catalog with a vetted snapshot fallback |
+| No way to verify each free model | `GET/POST /api/models/test?model=opencode/<id>` runs the real CLI with a tiny prompt and returns the real text or real error |
+
+**Remaining (external / not in this repo's control):**
+
+1. **Upstream free quota (primary blocker).** A real full `opencode run` on Vercel with
+   `opencode/deepseek-v4.1-flash-free` reached OpenCode Zen and returned
+   `provider.free-limit` / HTTP 429 `Free usage limit reached` with
+   `retryAfterMs ≈ 80,000,000` (~22 h). Other routable free models returned the same 429;
+   retired ids return `provider.no-route` ("Model unavailable"). **No successful assistant
+   answer exists yet**, and none was faked. Waiting for the quota reset, subscribing to
+   OpenCode Go, or setting a provider key with a non-free model are the only honest fixes.
 2. **Duration.** A single HTTP request must finish within `maxDuration` (300 s Hobby).
    Long runs return `AGENT_TIMEOUT` (or Vercel's 504) instead of a partial fake answer.
-3. **Supabase + GitHub App.** Not provisioned by me; needed for auth, ownership and repo
-   access. `/api/config` on the deployment shows exactly which variables are missing.
+   A `VercelSandboxAdapter` (microVM) is the production path for multi-minute runs.
+3. **Supabase GitHub OAuth.** The connector cannot set the OAuth client id/secret;
+   `external_github_enabled` remains `false`. Enable it once in the dashboard
+   (`docs/SUPABASE.md`). Until then `/api/me` returns `user: null` and the sign-in button
+   cannot start OAuth.
 4. **Snap / privileged install.** Still impossible in Vercel Functions; see `docs/SETUP.md`.
+5. **PAT rotation.** The PAT pasted in chat is compromised; rotate/revoke it and replace the
+   sensitive Vercel env var.
 
-So: **the actual OpenCode binary DID run on Vercel**, but a **full model-backed agent run on
-Vercel has NOT been performed**. The code is a real adapter plus a working website/auth/DB
-foundation, not a claim of an end-to-end agent answer.
+So: **the actual OpenCode binary ran a full model-backed `opencode run` on Vercel** and the
+whole chain (Function → CLI → `--standalone` → Zen request → NDJSON error) is proven. What is
+**not** proven is a successful assistant answer, because the upstream free tier is exhausted.
 
 ## 5. Smallest change that completes the end-to-end agent run
 

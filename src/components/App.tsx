@@ -44,6 +44,7 @@ type ModelTestResult = {
   exitCode: number | null;
   durationMs: number;
   timedOut: boolean;
+  quota?: { retryAfterMs: number; retryAfterHours: number } | null;
 };
 
 type Repo = {
@@ -136,6 +137,8 @@ export default function App() {
   const [probe, setProbe] = useState<ProbeResult | null>(null);
   const [probing, setProbing] = useState(false);
   const [models, setModels] = useState<FreeModel[]>([]);
+  const [catalogSource, setCatalogSource] = useState<'live' | 'snapshot'>('snapshot');
+  const [catalogNote, setCatalogNote] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState('opencode/deepseek-v4.1-flash-free');
   const [modelTests, setModelTests] = useState<ModelTestResult[]>([]);
   const [testing, setTesting] = useState(false);
@@ -153,12 +156,20 @@ export default function App() {
       const [meRes, configRes, modelsRes] = await Promise.all([
         api<MeResponse>('/api/me'),
         api<ConfigStatus>('/api/config'),
-        api<{ models: FreeModel[]; configuredModel: string }>('/api/models'),
+        api<{ models: FreeModel[]; configuredModel: string; source: 'live' | 'snapshot'; note: string | null; count: number }>('/api/models'),
       ]);
       setMe(meRes);
       setConfig(configRes);
       setModels(modelsRes.models);
-      setSelectedModel((current) => current || modelsRes.configuredModel || 'opencode/deepseek-v4.1-flash-free');
+      setCatalogSource(modelsRes.source);
+      setCatalogNote(modelsRes.note);
+      setSelectedModel((current) =>
+        modelsRes.models.some((model) => model.fullId === current)
+          ? current
+          : (modelsRes.models.some((model) => model.fullId === modelsRes.configuredModel)
+              ? modelsRes.configuredModel
+              : (modelsRes.models[0]?.fullId ?? 'opencode/deepseek-v4.1-flash-free')),
+      );
       if (!meRes.user) {
         setSessions([]);
         setRepos([]);
@@ -285,6 +296,7 @@ export default function App() {
           exitCode: null,
           durationMs: 0,
           timedOut: false,
+          quota: null,
         },
         ...previous,
       ].slice(0, 47));
@@ -420,7 +432,10 @@ export default function App() {
                     ))}
                   </select>
                 </div>
-                <div className="hint">{models.length} free models from the official OpenCode catalog.</div>
+                <div className="hint">
+                  {models.length} free models · {catalogSource === 'live' ? 'live official catalog' : 'bundled snapshot'}.
+                  {catalogNote ? ` ${catalogNote}` : ''}
+                </div>
                 {config?.modelTestsEnabled ? (
                   <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
                     <button className="btn small" type="button" onClick={() => void testModel(selectedModel)} disabled={testing || testingAll}>
@@ -439,6 +454,7 @@ export default function App() {
                       <div key={result.model} className={`msg ${result.ok ? 'assistant' : 'system'}`} style={{ padding: '7px 9px' }}>
                         <div className="who">{result.ok ? 'PASS' : 'FAIL'} · {result.model.replace('opencode/', '')}</div>
                         <pre>{result.ok ? (result.text ?? '').slice(0, 160) : (result.error ?? 'unknown error')}</pre>
+                        {result.quota ? <div className="who">Upstream free quota · retry in ~{result.quota.retryAfterHours} h</div> : null}
                       </div>
                     ))}
                   </div>
