@@ -29,6 +29,11 @@ type ConfigStatus = {
   keylessOnVercel: boolean;
   vercelOidcConfigured: boolean;
   disableZenFreeModels: boolean;
+  /** Real server-side Supabase Auth provider check (never a client guess). */
+  githubOauthEnabled?: boolean;
+  githubOauthReason?: string;
+  githubOauthFix?: string | null;
+  oauthStatusSource?: 'settings' | 'authorize-probe' | 'unavailable';
   missing: string[];
   setupMessage: string;
 };
@@ -154,6 +159,7 @@ export default function App() {
   const [modelTests, setModelTests] = useState<ModelTestResult[]>([]);
   const [testing, setTesting] = useState(false);
   const [testingAll, setTestingAll] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const loadMessages = useCallback(async (id: string) => {
     const response = await api<{ messages: Message[] }>(`/api/sessions/${id}/messages`);
@@ -210,6 +216,17 @@ export default function App() {
       setLoading(false);
     }
   }, [selectedRepo]);
+
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get('error');
+    if (reason === 'auth-failed' || reason === 'missing-code') {
+      setAuthError(
+        reason === 'auth-failed'
+          ? 'The OAuth callback could not be exchanged for a session.'
+          : 'The OAuth callback arrived without an authorization code.',
+      );
+    }
+  }, []);
 
   useEffect(() => {
     void load();
@@ -363,9 +380,33 @@ export default function App() {
           {config && !config.supabaseConfigured && (
             <div className="notice warn">Supabase is not configured yet. See the setup instructions before signing in.</div>
           )}
+          {config?.githubOauthEnabled === false && (
+            <div className="notice warn">
+              <strong>GitHub sign-in is currently unavailable.</strong> {config.githubOauthReason}
+              {config.githubOauthFix ? <div className="hint" style={{ marginTop: 8 }}>{config.githubOauthFix}</div> : null}
+              <div className="hint" style={{ marginTop: 8 }}>
+                Verified on the server from Supabase Auth ({config.oauthStatusSource ?? 'unknown source'}); this is a
+                dashboard setting, not an application error.
+              </div>
+            </div>
+          )}
+          {authError && (
+            <div className="notice error">
+              <strong>Sign-in did not complete.</strong> {authError}{' '}
+              {config?.githubOauthEnabled === false ? config.githubOauthReason : 'Check the Supabase Auth provider settings.'}
+            </div>
+          )}
           <form className="inline" method="post" action="/api/auth/signin">
-            <button className="btn primary" type="submit">Continue with GitHub</button>
+            <button className="btn primary" type="submit" disabled={config?.githubOauthEnabled === false}>
+              {config?.githubOauthEnabled === false ? 'GitHub sign-in unavailable' : 'Continue with GitHub'}
+            </button>
           </form>
+          {config?.githubOauthEnabled === false && (
+            <div className="hint" style={{ marginTop: 8 }}>
+              The button is disabled because Supabase Auth would reject the OAuth request with HTTP 400. It will
+              re-enable automatically once the GitHub provider is enabled in the dashboard.
+            </div>
+          )}
         </div>
       </div>
     );

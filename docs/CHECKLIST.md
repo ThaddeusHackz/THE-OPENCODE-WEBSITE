@@ -72,9 +72,15 @@ production alias assigned.
 - [ ] **Rotate/revoke the GitHub fine-grained PAT** that was pasted in chat
       earlier. It is compromised. Its value is not in the repo.
 - [ ] **Enable Supabase GitHub OAuth** (client id + secret) in the Supabase
-      dashboard — the connector does not expose those fields. Until then sign-in
-      cannot be exercised; `/api/me` returns `user: null`. RLS policies and
-      the redirect allowlist are already in place.
+      dashboard — the connector does not expose those fields. Exact numbered
+      click-path in [docs/SUPABASE.md](SUPABASE.md). Independently reproduced:
+      the authorize URL returns HTTP 400 `Unsupported provider: provider is not
+      enabled` for GitHub (and Google/Discord/Azure controls), and the project's
+      auth config has every `external_*_enabled: false`. `/api/config` now
+      checks this on the server and the UI shows the exact reason + fix and
+      disables the sign-in button instead of offering a dead end. Until then
+      `/api/me` returns `user: null`. RLS policies and the redirect allowlist
+      are already in place and unchanged.
 - [ ] Optional: regenerate the catalog when the pinned OpenCode CLI version is
       bumped (the live models.dev catalog can drift from the bundled snapshot).
 - [ ] Still **not implemented / deliberately disabled**: Vercel Sandbox adapter,

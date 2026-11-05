@@ -35,22 +35,71 @@ no existing table/policy/domain was modified, and `site_url` was left untouched.
 - `execute_query` confirmed the two tables and 8 policies.
 - `get_auth_config` confirms the new redirect entries are present.
 
-## Remaining manual step (connector limitation)
+## Root cause of the broken GitHub sign-in (reproduced 2026-11-05)
 
-`external_github_enabled` is still `false` (as before). The connector's `update_auth_config`
-schema exposes email/phone toggles, JWT, signup, site URL and redirect allowlist — it does
-**not** expose `external_github_client_id` / `external_github_secret` /
-`external_github_enabled`. Therefore GitHub sign-in must be enabled once in the Supabase
-dashboard:
+`POST /api/auth/signin` is correct: it builds a Supabase OAuth URL and returns a 307 to
+`https://xmbkmdqaczlxkdarayyy.supabase.co/auth/v1/authorize?provider=github&redirect_to=https://the-opencode-website-poc.vercel.app/auth/callback`
+with valid PKCE challenge / `code_verifier` cookies. The failure is one hop later, in the
+Supabase project itself:
 
-1. Create a GitHub OAuth App (or reuse an existing one) with callback
-   `https://xmbkmdqaczlxkdarayyy.supabase.co/auth/v1/callback`.
-2. Supabase Dashboard → Authentication → Providers → GitHub → enable and paste the client ID
-   and secret (never into this repo).
-3. Confirm the Vercel domain is in Redirect URLs (already added above).
+```
+GET /auth/v1/authorize?provider=github&redirect_to=...  -> HTTP 400
+{"code":400,"error_code":"validation_failed","msg":"Unsupported provider: provider is not enabled"}
+```
 
-Until that is done, `/api/me` returns `{ "user": null }` and the sign-in button cannot start an
-OAuth flow. The app shows a setup message instead of pretending a user is signed in.
+Controls reproduce the same 400 for `provider=google` and `provider=discord`, and a
+`Provider azuread could not be found` 400 for `provider=azuread`.
+`GET /auth/v1/settings` without an `apikey` returns `No API key found in request`.
+`get_auth_config` on project `xmbkmdqaczlxkdarayyy` shows **every**
+`external_*_enabled: false` and `external_github_client_id: null`,
+`external_github_secret: null`. There is no third-party OAuth provider enabled at all.
+
+**Conclusion: dashboard configuration gap, not an application bug.** RLS and the existing
+server auth wiring are unchanged (reproduction did not implicate them).
+
+The app no longer ships a dead-end button: `/api/config` performs a real server-side check
+(`src/lib/supabase/oauth.ts`) — `GET /auth/v1/settings` with `SUPABASE_SERVICE_ROLE_KEY` if
+configured, otherwise the publishable anon key; if that is unreadable it probes the
+`/auth/v1/authorize?provider=github` endpoint. It returns `githubOauthEnabled`,
+`githubOauthReason`, `githubOauthFix` and `oauthStatusSource` (`settings` /
+`authorize-probe` / `unavailable`). When the provider is disabled the UI shows the exact
+reason and fix and disables the sign-in button. No key value is ever returned or logged.
+Results are cached 60 s so config checks do not hammer Supabase.
+
+## EXACT enablement steps — dashboard-only, I cannot perform these myself
+
+1. **GitHub → Settings → Developer settings → OAuth Apps → New OAuth App**
+   (or `https://github.com/settings/developers` → **New OAuth App**).
+   - Application name: anything (e.g. `OpenCode Web PoC`).
+   - Homepage URL: `https://the-opencode-website-poc.vercel.app`.
+   - **Authorization callback URL** (exact):
+     `https://xmbkmdqaczlxkdarayyy.supabase.co/auth/v1/callback`
+   - Click **Register application**, then **Generate a new client secret**. Copy the
+     **Client ID** and the **Client Secret**. Never paste either into this repo, chat, or a
+     `NEXT_PUBLIC_*` variable.
+2. **Supabase Dashboard → select project `anticodex` (`xmbkmdqaczlxkdarayyy`) →
+   Authentication → Providers (Third-party) → GitHub.**
+   - Turn the GitHub provider **Enabled**.
+   - Paste the **Client ID** and **Client Secret** from step 1.
+   - Click **Save**.
+3. **Supabase Dashboard → Authentication → URL Configuration.**
+   - **Site URL:** confirm it is appropriate for this app. It is currently
+     `https://anticodex.vercel.app` (this Supabase project is shared with another app; we
+     deliberately left it unchanged — decide in the dashboard, don't let this PoC rewrite it).
+   - **Redirect URLs:** confirm
+     `https://the-opencode-website-poc.vercel.app/auth/callback` is present. It **is** already
+     in `uri_allow_list` (added additively earlier), together with
+     `https://the-opencode-website-poc.vercel.app/*` and `http://localhost:3000/*`.
+   - Click **Save** if you changed anything.
+4. **Verify:** reload the live app; `/api/config` should report
+   `githubOauthEnabled: true` and `oauthStatusSource: "settings"`, the sign-in button
+   re-enables, and `/api/me` should return a user after signing in.
+
+All four steps are **dashboard-only actions** that I cannot perform myself: the Supabase
+connector's `update_auth_config` exposes email/phone toggles, JWT, signup, site URL and the
+redirect allowlist, but **not** `external_github_client_id`, `external_github_secret` or
+`external_github_enabled`, and GitHub OAuth App creation requires your GitHub account.
+Until step 2 is done, `/api/me` returns `{ "user": null }` and sign-in cannot start.
 
 ## Security model unchanged
 
