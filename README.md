@@ -1,5 +1,26 @@
 # THE OPENCODE WEBSITE — proof of concept
 
+## The public site
+
+The deployed domain is a Winfy-style portal: a home page with an app tile grid,
+a banner, four system profiles, a games strip, six feature cards and a full
+footer, plus a dedicated page for every app (`/wine-online`, `/vlc-online`,
+`/notepad-online`, `/tetris-cube`, `/snake-candy-game`, `/pong-candy-game`,
+`/format-factory-online`, `/reactos-online`, `/win-10-theme`,
+`/windows-explorer`, `/terminal`, `/opencode-studio`).
+
+Nothing on those pages is a mock: each app page has a launch button that opens
+the real window inside `/runwine`, and every screenshot in `public/previews/` is
+a capture of this deployment. The marketing chrome lives in
+`src/components/site/` + `src/app/(site)/`, the catalog in `src/lib/apps.ts`,
+and the brand/navigation constants in `src/lib/site.ts`.
+
+The workspace itself is still `/runwine` (also reachable through the legacy
+`/runwine/index.php` and `/runwine/start.php` rewrites) and keeps its own dark
+interface, so links from the portal drop straight into a working desktop.
+
+## Running the real agent
+
 A proof of concept for running the **real OpenCode v2 CLI** against a GitHub
 repository from a serverless Vercel Function, with Supabase-backed sessions.
 

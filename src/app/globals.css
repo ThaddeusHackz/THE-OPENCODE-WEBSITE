@@ -113,7 +113,8 @@ form.inline { display: inline; }
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
-.winfy-brand { display: flex; align-items: center; gap: 10px; }
+.winfy-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.winfy-brand:hover { text-decoration: none; }
 .winfy-brand strong { display: block; font-size: 15px; letter-spacing: -0.01em; }
 .winfy-brand span { display: block; font-size: 11.5px; color: var(--muted); }
 

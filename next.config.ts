@@ -14,6 +14,12 @@ const binaryIncludes = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['tar'],
+  /**
+   * The workspace is previewed through a proxied host in the development
+   * sandbox. Without this, Next blocks the dev HMR socket and hot reload
+   * silently stops working behind the proxy.
+   */
+  allowedDevOrigins: ['*.e2b.app'],
   outputFileTracingIncludes: {
     '/api/agent/run': binaryIncludes,
     '/api/runtime/probe': binaryIncludes,
