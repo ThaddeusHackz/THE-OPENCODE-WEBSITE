@@ -36,6 +36,16 @@ const nextConfig: NextConfig = {
     '/api/runtime/poc': binaryIncludes,
     '/api/models/test': binaryIncludes,
   },
+  /**
+   * This deployment hosts a copy of someone else's landing page for a private
+   * proof of concept, so keep it out of search indexes.
+   */
+  async headers() {
+    return winfyPaths.map((source) => ({
+      source,
+      headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+    }));
+  },
   async rewrites() {
     return {
       beforeFiles: winfyPaths.map((source) => ({ source, destination: '/winfy-site.html' })),
