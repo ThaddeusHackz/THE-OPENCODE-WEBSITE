@@ -28,8 +28,8 @@ export function SiteFooter() {
               <Link href={SITE.launchPath} className="btn btn-primary">
                 Launch desktop
               </Link>
-              <Link href={SITE.openCodePath} className="btn btn-outline btn-on-dark">
-                Open OpenCode
+              <Link href="/opencode-studio" className="btn btn-outline btn-on-dark">
+                OpenCode Studio
               </Link>
             </div>
           </div>

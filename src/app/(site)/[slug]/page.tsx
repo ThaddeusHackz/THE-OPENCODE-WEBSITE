@@ -73,7 +73,7 @@ export default async function AppPage({ params }: AppPageProps) {
               </Link>
               <div className="launch-card-links">
                 <Link href={`/runwine?os=${encodeURIComponent(app.launch.os)}&desktop=1`}>Full desktop</Link>
-                <Link href={SITE.openCodePath}>OpenCode Studio</Link>
+                <Link href="/opencode-studio">OpenCode Studio</Link>
               </div>
             </div>
           </div>

@@ -38,7 +38,7 @@ export default function HomePage() {
               Launch the desktop
               <UiIcon name="arrow" size={17} />
             </Link>
-            <Link href={SITE.openCodePath} className="btn btn-outline btn-lg">
+            <Link href="/opencode-studio" className="btn btn-outline btn-lg">
               <UiIcon name="terminal" size={17} />
               Open OpenCode Studio
             </Link>

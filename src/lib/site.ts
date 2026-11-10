@@ -16,7 +16,9 @@ export const SITE = {
   repoUrl: 'https://github.com/ThaddeusHackz/THE-OPENCODE-WEBSITE',
   launchPath: '/runwine?desktop=1',
   launchLoginPath: '/runwine/index.php',
-  openCodePath: '/runwine?window=opencode',
+  /** Public app page. Its launch button opens the real window in /runwine. */
+  openCodePath: '/opencode-studio',
+  openCodeWindowPath: '/runwine?window=opencode&desktop=1',
   desktopPath: '/runwine',
   copyrightYear: 2026,
   disclaimer:
