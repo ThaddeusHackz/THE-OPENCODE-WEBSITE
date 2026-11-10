@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { SITE } from '@/lib/site';
 
 export const metadata: Metadata = {
-  title: `Terms of Service — ${SITE.name}`,
+  title: 'Terms of Service',
   description: 'The rules for using this browser workspace, the coding agent and the apps it hosts.',
   alternates: { canonical: '/terms-of-service' },
 };

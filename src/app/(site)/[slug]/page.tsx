@@ -16,11 +16,11 @@ export async function generateMetadata({ params }: AppPageProps): Promise<Metada
   const app = getApp(slug);
   if (!app) return { title: 'App not found' };
   return {
-    title: `${app.name} — ${SITE.name}`,
+    title: app.name,
     description: `${app.short}. ${app.lead} Runs in the browser with no installation.`,
     alternates: { canonical: app.path },
     openGraph: {
-      title: `${app.name} — ${SITE.name}`,
+      title: app.name,
       description: app.short,
       url: app.path,
       type: 'website',

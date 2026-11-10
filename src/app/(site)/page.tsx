@@ -6,7 +6,7 @@ import { AppTile } from '@/components/site/AppTile';
 import { AppIcon, UiIcon } from '@/components/site/AppIcon';
 
 export const metadata: Metadata = {
-  title: `${SITE.name} — ${SITE.tagline}`,
+  title: { absolute: `${SITE.name} — ${SITE.tagline}` },
   description: SITE.longDescription,
   alternates: { canonical: '/' },
 };

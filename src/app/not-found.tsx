@@ -8,7 +8,7 @@ import { AppTile } from '@/components/site/AppTile';
 import { UiIcon } from '@/components/site/AppIcon';
 
 export const metadata = {
-  title: `Page not found — ${SITE.name}`,
+  title: { absolute: `Page not found — ${SITE.name}` },
 };
 
 export default function NotFound() {

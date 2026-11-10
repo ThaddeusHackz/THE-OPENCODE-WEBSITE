@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { SITE } from '@/lib/site';
 
 export const metadata: Metadata = {
-  title: `Privacy Policy — ${SITE.name}`,
+  title: 'Privacy Policy',
   description: 'What this deployment stores, what it never stores, and who processes data on its behalf.',
   alternates: { canonical: '/privacy-policy' },
 };
