@@ -360,13 +360,13 @@ export default function WinfyApp({
   return (
     <div className="winfy-shell">
       <header className="winfy-header">
-        <div className="winfy-brand">
+        <Link className="winfy-brand" href="/" title="Back to winfy.net home">
           <WinfyBrandLogo size={32} />
           <div>
             <strong>Winfy · RunWine</strong>
             <span>WineGUI Ubuntu 22 + OpenCode v2.2.5</span>
           </div>
-        </div>
+        </Link>
 
         <nav className="winfy-nav" aria-label="Primary navigation">
           <button

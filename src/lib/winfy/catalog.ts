@@ -1,3 +1,5 @@
+import { APP_PATHS } from '../apps';
+
 export type WinfyTheme = 'ubuntu-winegui' | 'win11' | 'win10' | 'reactos';
 
 export type DesktopWindowId =
@@ -284,7 +286,15 @@ export function sanitizeNextPath(raw?: string | null): string {
   try {
     const parsed = new URL(trimmed, 'http://localhost');
     if (parsed.origin !== 'http://localhost') return '/';
-    const allowedPaths = new Set(['/', '/runwine', '/runwine/index.php', '/runwine/start.php', '/wine-online']);
+    const allowedPaths = new Set([
+      '/',
+      '/runwine',
+      '/runwine/index.php',
+      '/runwine/start.php',
+      '/terms-of-service',
+      '/privacy-policy',
+      ...APP_PATHS,
+    ]);
     if (!allowedPaths.has(parsed.pathname)) return '/';
     return `${parsed.pathname}${parsed.search}`;
   } catch {
