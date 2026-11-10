@@ -2,22 +2,34 @@
 
 ## The public site
 
-The deployed domain is a Winfy-style portal: a home page with an app tile grid,
-a banner, four system profiles, a games strip, six feature cards and a full
-footer, plus a dedicated page for every app (`/wine-online`, `/vlc-online`,
-`/notepad-online`, `/tetris-cube`, `/snake-candy-game`, `/pong-candy-game`,
-`/format-factory-online`, `/reactos-online`, `/win-10-theme`,
-`/windows-explorer`, `/terminal`, `/opencode-studio`).
+The deployed domain serves the Winfy portal itself. `/`, `/opencode-studio` and
+the legacy `/runwine`, `/runwine/index.php` and `/runwine/start.php` launcher
+URLs all return `public/winfy-site.html`: the reference landing page kept
+verbatim — markup, inline Elementor/Astra styles, banner, 128 px tile grid,
+feature blocks and footer — and served from this domain, so the address bar
+never leaves `the-opencode-website-poc.vercel.app`. The routing lives in
+`winfyPaths` in `next.config.ts` as a `beforeFiles` rewrite.
 
-Nothing on those pages is a mock: each app page has a launch button that opens
-the real window inside `/runwine`, and every screenshot in `public/previews/` is
-a capture of this deployment. The marketing chrome lives in
-`src/components/site/` + `src/app/(site)/`, the catalog in `src/lib/apps.ts`,
-and the brand/navigation constants in `src/lib/site.ts`.
+Only two families of change were applied to that document:
 
-The workspace itself is still `/runwine` (also reachable through the legacy
-`/runwine/index.php` and `/runwine/start.php` rewrites) and keeps its own dark
-interface, so links from the portal drop straight into a working desktop.
+1. every `src` was made absolute (`https://www.winfy.net/...`) so the
+   stylesheets' 128 px icons and the banner resolve from the origin host;
+2. interactive links point either at the app page this repo ships
+   (`/wine-online`, `/vlc-online`, `/notepad-online`, `/tetris-cube`,
+   `/snake-candy-game`, `/pong-candy-game`, `/format-factory-online`,
+   `/reactos-online`, `/win-10-theme`) or, for the pages this repo does not
+   implement (`/apps/*`, `/about-us`, `/contact-us`, `/faqs`), back at the
+   original site.
+
+`tests/winfy-page.test.ts` enforces both rules, so a re-capture of the page
+cannot silently ship root-relative assets or dead links.
+
+Those app pages are native Next.js routes (`src/app/(site)/`, catalog in
+`src/lib/apps.ts`, brand/navigation constants in `src/lib/site.ts`). Every one
+of them has a launch button that opens the real window in the workspace at
+`/workspace`, and every screenshot in `public/previews/` is a real capture of
+this deployment. The workspace keeps its own dark interface and the same
+`?os=`, `?window=` and `?desktop=1` query contract the launcher used to expose.
 
 ## Running the real agent
 

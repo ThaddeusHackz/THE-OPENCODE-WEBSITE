@@ -3,7 +3,7 @@ import { DEFAULT_WINFY_OS } from '@/lib/winfy/catalog';
 
 export const dynamic = 'force-dynamic';
 
-type RunWinePageProps = {
+type WorkspacePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
@@ -11,7 +11,7 @@ function firstParam(value: string | string[] | undefined): string | null {
   return typeof value === 'string' ? value : Array.isArray(value) ? (value[0] ?? null) : null;
 }
 
-export default async function RunWinePage({ searchParams }: RunWinePageProps) {
+export default async function WorkspacePage({ searchParams }: WorkspacePageProps) {
   const params = await searchParams;
   const os = firstParam(params.os) ?? DEFAULT_WINFY_OS;
   const desktopParam = firstParam(params.desktop);

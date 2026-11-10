@@ -72,7 +72,7 @@ export default async function AppPage({ params }: AppPageProps) {
                 <UiIcon name="arrow" size={17} />
               </Link>
               <div className="launch-card-links">
-                <Link href={`/runwine?os=${encodeURIComponent(app.launch.os)}&desktop=1`}>Full desktop</Link>
+                <Link href={`/workspace?os=${encodeURIComponent(app.launch.os)}&desktop=1`}>Full desktop</Link>
                 <Link href="/opencode-studio">OpenCode Studio</Link>
               </div>
             </div>
@@ -134,7 +134,7 @@ export default async function AppPage({ params }: AppPageProps) {
                     </li>
                     <li>{system.label}</li>
                     <li>
-                      <Link href={`/runwine?os=${encodeURIComponent(system.id)}&desktop=1`}>Switch to this desktop →</Link>
+                      <Link href={`/workspace?os=${encodeURIComponent(system.id)}&desktop=1`}>Switch to this desktop →</Link>
                     </li>
                   </ul>
                 </section>

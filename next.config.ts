@@ -12,6 +12,16 @@ const binaryIncludes = [
   './node_modules/@opencode/cli/bin/**',
 ];
 
+/**
+ * Paths that must render the reference portal exactly (public/winfy-site.html).
+ *
+ * `/` is the public landing page, `/opencode-studio` is what the portal's
+ * OpenCode Studio links point at, and `/runwine*` are the legacy launcher URLs
+ * that used to open the boot screen. All of them now return the same document
+ * without changing the address bar, so the visitor never leaves this domain.
+ */
+const winfyPaths = ['/', '/opencode-studio', '/runwine', '/runwine/index.php', '/runwine/start.php'];
+
 const nextConfig: NextConfig = {
   serverExternalPackages: ['tar'],
   /**
@@ -27,10 +37,11 @@ const nextConfig: NextConfig = {
     '/api/models/test': binaryIncludes,
   },
   async rewrites() {
-    return [
-      { source: '/runwine/index.php', destination: '/runwine' },
-      { source: '/runwine/start.php', destination: '/runwine' },
-    ];
+    return {
+      beforeFiles: winfyPaths.map((source) => ({ source, destination: '/winfy-site.html' })),
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 
