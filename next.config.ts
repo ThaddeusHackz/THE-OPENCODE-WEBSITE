@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/agent/run': binaryIncludes,
     '/api/runtime/probe': binaryIncludes,
+    '/api/runtime/poc': binaryIncludes,
+    '/api/models/test': binaryIncludes,
+  },
+  async rewrites() {
+    return [
+      { source: '/runwine/index.php', destination: '/runwine' },
+      { source: '/runwine/start.php', destination: '/runwine' },
+    ];
   },
 };
 
