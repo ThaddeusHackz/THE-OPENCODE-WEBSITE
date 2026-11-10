@@ -4,7 +4,7 @@ import type { DesktopWindowId } from './winfy/catalog';
  * Public app catalog for the marketing site.
  *
  * Every entry maps to something that actually runs in the browser workspace
- * (`/runwine`), so the tile grid, the app pages and the launch buttons can never
+ * (`/workspace`), so the tile grid, the app pages and the launch buttons can never
  * point at software this project does not ship.
  */
 export type AppCategory = 'systems' | 'media' | 'tools' | 'games' | 'agent';
@@ -342,40 +342,6 @@ export const APPS: SiteApp[] = [
     preview: '/previews/terminal.jpg',
     previewAlt: 'The terminal window showing real runtime probe output',
   },
-  {
-    slug: 'opencode-studio',
-    path: '/opencode-studio',
-    name: 'OpenCode Studio',
-    category: 'agent',
-    icon: 'opencode',
-    short: 'The real coding agent, in a window',
-    lead: 'Enjoy the real OpenCode agent over our platform:',
-    description: [
-      'OpenCode Studio is the reason this site exists. It runs the actual opencode 2.2.5 command line inside a Vercel Function: your prompt is handed to the binary in a fresh temporary workspace with a real copy of the repository, and the answer, the changed files and the diff come back from that run.',
-      'Choose a repository and a branch, select one of the free models, and read the reply in the chat window. Every conversation is stored in Postgres under row-level security, so the history is yours and nobody else can read it. There are no mocked replies anywhere in the pipeline.',
-    ],
-    features: [
-      'A live probe that proves the OpenCode binary exists in the deployed function.',
-      'Repository and branch selection backed by your own GitHub permissions.',
-      'Free model catalog with per-model verification runs.',
-      'Chat transcript with assistant output, changed-file summary and unified diff blocks.',
-      'Sessions saved to Supabase Postgres with row-level security.',
-    ],
-    requirements: [
-      'A GitHub account, used to sign in and to authorize repository access.',
-      'A repository you own or collaborate on.',
-      'One configured model provider key on the server (or the automatic Vercel OIDC token).',
-    ],
-    limitations: [
-      'Runs are read-only against your repository: changes are returned as a diff and never pushed automatically.',
-      'Each request has a bounded runtime and repository size, so very large repositories are rejected.',
-      'If the server is not configured, the window says so instead of inventing an answer.',
-    ],
-    launch: { window: 'opencode', os: DEFAULT_OS },
-    preview: '/previews/opencode-studio.jpg',
-    previewAlt: 'The OpenCode Studio window with repository picker and chat',
-    badge: 'Real agent',
-  },
 ];
 
 export const APP_PATHS: readonly string[] = APPS.map((app) => app.path);
@@ -395,7 +361,7 @@ export function relatedApps(app: SiteApp, limit = 4): SiteApp[] {
 
 export function launchHref(app: SiteApp): string {
   const params = new URLSearchParams({ os: app.launch.os, window: app.launch.window, desktop: '1' });
-  return `/runwine?${params.toString()}`;
+  return `/workspace?${params.toString()}`;
 }
 
 export const CATEGORY_LABELS: Record<AppCategory, string> = {

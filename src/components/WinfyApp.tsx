@@ -81,7 +81,7 @@ export default function WinfyApp({
   const [testing, setTesting] = useState(false);
   const [testingAll, setTestingAll] = useState(false);
 
-  const returnPath = `/runwine/index.php?os=${encodeURIComponent(osProfile.id)}&desktop=1`;
+  const returnPath = `/workspace?os=${encodeURIComponent(osProfile.id)}&desktop=1`;
 
   const loadMessages = useCallback(async (id: string) => {
     const response = await api<{ messages: Message[] }>(`/api/sessions/${id}/messages`);
@@ -587,7 +587,7 @@ export default function WinfyApp({
           <span>Winfy RunWine Web Workspace · Powered by Next.js, OpenCode CLI v2.2.5, Vercel &amp; Supabase</span>
         </div>
         <div className="winfy-footer-links">
-          <Link href="/runwine/index.php?os=winegui_2_ubuntu-22-amd64">/runwine/index.php</Link>
+          <Link href="/workspace?os=winegui_2_ubuntu-22-amd64">/workspace</Link>
           <Link href="/wine-online">Wine Online</Link>
           <Link href="/terms-of-service">Terms of Service</Link>
           <Link href="/privacy-policy">Privacy Policy</Link>

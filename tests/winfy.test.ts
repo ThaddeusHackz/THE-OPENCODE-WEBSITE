@@ -39,14 +39,14 @@ describe('Winfy RunWine catalog and routing helpers', () => {
   });
 
   it('prevents open redirects in post-OAuth return paths', () => {
-    expect(sanitizeNextPath('/runwine/index.php?os=winegui_2_ubuntu-22-amd64&desktop=1')).toBe(
-      '/runwine/index.php?os=winegui_2_ubuntu-22-amd64&desktop=1',
+    expect(sanitizeNextPath('/workspace?os=winegui_2_ubuntu-22-amd64&desktop=1')).toBe(
+      '/workspace?os=winegui_2_ubuntu-22-amd64&desktop=1',
     );
     expect(sanitizeNextPath('/?desktop=1')).toBe('/?desktop=1');
     expect(sanitizeNextPath('https://evil.example/phish')).toBe('/');
     expect(sanitizeNextPath('//evil.example/phish')).toBe('/');
     expect(sanitizeNextPath('/\\evil.example')).toBe('/');
     expect(sanitizeNextPath('/api/auth/signout')).toBe('/');
-    expect(sanitizeNextPath('/runwine\r\nLocation: https://evil.example')).toBe('/');
+    expect(sanitizeNextPath('/workspace\r\nLocation: https://evil.example')).toBe('/');
   });
 });

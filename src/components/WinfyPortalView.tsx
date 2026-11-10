@@ -91,7 +91,7 @@ export function WinfyPortalView({
       <section className="portal-section">
         <div className="portal-section-head">
           <h3>RunWine OS Environments</h3>
-          <span className="muted-sm">Exact ?os= profiles supported directly inside /runwine/index.php</span>
+          <span className="muted-sm">Exact ?os= profiles supported directly inside /workspace</span>
         </div>
         <div className="os-cards-grid">
           {WINFY_OS_PROFILES.map((os) => (

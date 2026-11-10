@@ -288,9 +288,7 @@ export function sanitizeNextPath(raw?: string | null): string {
     if (parsed.origin !== 'http://localhost') return '/';
     const allowedPaths = new Set([
       '/',
-      '/runwine',
-      '/runwine/index.php',
-      '/runwine/start.php',
+      '/workspace',
       '/terms-of-service',
       '/privacy-policy',
       ...APP_PATHS,

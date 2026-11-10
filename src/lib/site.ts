@@ -14,12 +14,12 @@ export const SITE = {
     'Winfy is a browser workspace. Open one link and you get a Windows-style desktop with media tools, image conversion, classic arcade games, a terminal and the real OpenCode CLI — no install, no plugin, no download.',
   url: 'https://the-opencode-website-poc.vercel.app',
   repoUrl: 'https://github.com/ThaddeusHackz/THE-OPENCODE-WEBSITE',
-  launchPath: '/runwine?desktop=1',
-  launchLoginPath: '/runwine/index.php',
-  /** Public app page. Its launch button opens the real window in /runwine. */
+  launchPath: '/workspace?desktop=1',
+  launchLoginPath: '/workspace',
+  /** Public app page. Its launch button opens the real window in /workspace. */
   openCodePath: '/opencode-studio',
-  openCodeWindowPath: '/runwine?window=opencode&desktop=1',
-  desktopPath: '/runwine',
+  openCodeWindowPath: '/workspace?window=opencode&desktop=1',
+  desktopPath: '/workspace',
   copyrightYear: 2026,
   disclaimer:
     'Independent technical project. Not affiliated with, endorsed by or operated by OpenCode, Anomaly, Winfy/ODGroup, OnWorks or OffiDocs.',

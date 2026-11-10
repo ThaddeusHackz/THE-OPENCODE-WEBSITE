@@ -17,7 +17,7 @@ describe('public app catalog', () => {
       expect(osIds.has(app.launch.os)).toBe(true);
       expect(resolveWinfyOs(app.launch.os).id).toBe(app.launch.os);
       expect(resolveWinfyWindow(app.launch.window)).toBe(app.launch.window);
-      expect(launchHref(app)).toBe(`/runwine?os=${app.launch.os}&window=${app.launch.window}&desktop=1`);
+      expect(launchHref(app)).toBe(`/workspace?os=${app.launch.os}&window=${app.launch.window}&desktop=1`);
     }
   });
 
